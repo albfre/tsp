@@ -230,7 +230,9 @@ namespace TravelingSalesmanSolver {
     const size_t pathK = path[ k ];
     const size_t kMinus1 = k == 0 ? path.size() - 1 : k - 1;
     const size_t pathKminus1 = path[ kMinus1 ];
-    double removedDistance = distances[ pathIminus1 ][ pathI ] + distances[ pathJminus1 ][ pathJ ] + distances[ pathKminus1 ][ pathK ];
+    // subtract a little something to avoid numerical errors
+    const double eps = 1e-9;
+    const double removedDistance = distances[ pathIminus1 ][ pathI ] + distances[ pathJminus1 ][ pathJ ] + distances[ pathKminus1 ][ pathK ] - eps;
 
     if ( distances[ pathJminus1 ][ pathK ] + distances[ pathIminus1 ][ pathKminus1 ] + distances[ pathJ ][ pathI ] < removedDistance ) {
       vector< size_t > pathCopy( path );
@@ -242,8 +244,8 @@ namespace TravelingSalesmanSolver {
       for ( size_t idx = kMinus1; idx >= j; --idx, ++pathIdx ) {
         path[ pathIdx ] = pathCopy[ idx ];
       }
-      assert( getLength( path, distances ) < getLength( pathCopy, distances ) );
       assert( pathIdx == path.size() );
+      assert( getLength( path, distances ) < getLength( pathCopy, distances ) );
       return true;
     }
 
@@ -325,12 +327,13 @@ namespace TravelingSalesmanSolver {
     if ( i < 2 && j + 1 == path.size() ) {
       return false;
     }
+    const double eps = 1e-9;
     const size_t pathI = path[ i ];
     const size_t pathJ = path[ j ];
     const size_t pathJplus1 = path[ j + 1 == path.size() ? 0 : j + 1 ];
     const size_t pathIminus1 = path[ i == 0 ? path.size() - 1 : i - 1 ];
     if ( distances[ pathIminus1 ][ pathJ ] + distances[ pathI ][ pathJplus1 ] <
-         distances[ pathIminus1 ][ pathI ] + distances[ pathJ ][ pathJplus1 ] ) {
+         distances[ pathIminus1 ][ pathI ] + distances[ pathJ ][ pathJplus1 ] - eps ) {
       reverse( path.begin() + i, path.begin() + j + 1 );
       return true;
     }
