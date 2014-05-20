@@ -6,8 +6,6 @@
 #include <iostream>
 #include <iomanip>
 #include <limits>
-//#include <numeric>
-//#include <stdexcept>
 #include <set>
 
 /* HEADER */
@@ -15,7 +13,7 @@
 
 using namespace std;
 
-namespace TravelingSalesmanSolver {
+namespace {
   void assertIsPath( const vector< size_t >& path, const vector< vector< double > >& distances )
   {
     assert( path.size() == distances.size() );
@@ -29,39 +27,48 @@ namespace TravelingSalesmanSolver {
     }
   }
 
-  size_t nSteps;
-  void reverse( vector< size_t >& path, const size_t i, const size_t j )
+  vector< size_t > getRandomPath( const vector< vector< double > >& distances )
   {
-    if ( j - i < path.size() - j + i ) {
-      reverse( path.begin() + i, path.begin() + j + 1 );
-      nSteps += ( j - i ) / 2;
+    vector< size_t > path( distances.size() );
+    for ( size_t i = 0; i < distances.size(); ++i ) {
+      path[ i ] = i;
     }
-    else {
-      size_t nnn = 0;
-      vector< size_t >::iterator iIt = path.begin() + i + 1;
-      vector< size_t >::iterator jIt = path.begin() + j;
-      for ( ; iIt != path.begin() && jIt != path.end(); ++jIt ) {
-        --iIt;
-        swap( *iIt, *jIt );
-        ++nSteps;
-        ++nnn;
-      }
-      if ( jIt == path.end() ) {
-        jIt = path.begin();
-      }
-      else if ( iIt == path.begin() ) {
-        iIt = path.end() - 1;
-      }
-      for ( ; iIt > jIt; --iIt, ++jIt ) {
-        swap( *iIt, *jIt );
-        ++nSteps;
-        ++nnn;
-      }
-      if ( fabs( int(nnn) - int( path.size() - j + i ) / 2 ) > 5 ) {
-        cerr << "n: " << nnn << " path.size() " << path.size() << " i: " << i << ", j: " << j << ", " <<  int( path.size() - j + i ) / 2  << endl;
-        assert( false );
-      }
+
+    for ( size_t i = 0; i < distances.size(); ++i ) {
+      size_t ind1 = rand() % distances.size();
+      size_t ind2 = rand() % distances.size();
+      swap( path[ ind1 ], path[ ind2 ] );
     }
+    return path;
+  }
+
+  vector< size_t > getNearestNeighborPath( const vector< vector< double > >& distances )
+  {
+    vector< size_t > path;
+    path.reserve( distances.size() );
+    size_t startNode = 0; //rand() % distances.size();
+    path.push_back( startNode );
+    set< size_t > usedNodes;
+    usedNodes.insert( startNode );
+    while ( path.size() < distances.size() ) {
+      size_t currentNode = path.back();
+      size_t minUnusedIndex = (size_t)-1;
+      double minUnusedDistance = numeric_limits< double >::max();
+      for ( size_t i = 0; i < distances.size(); ++i ) {
+        if ( usedNodes.find( i ) == usedNodes.end() ) {
+          double distance = distances[ currentNode ][ i ];
+          if ( distance < minUnusedDistance ) {
+            minUnusedIndex = i;
+            minUnusedDistance = distance;
+          }
+        }
+      }
+      assert( minUnusedIndex != (size_t)-1 );
+      path.push_back( minUnusedIndex );
+      usedNodes.insert( minUnusedIndex );
+    }
+    assertIsPath( path, distances );
+    return path;
   }
 
   struct Vertex {
@@ -69,7 +76,7 @@ namespace TravelingSalesmanSolver {
     size_t getIndex() const { return index_; }
     const vector< size_t >& getChildren() const { return children_; }
     void addChild( size_t index ) { children_.push_back( index ); }
-    void increaseDegree() { ++degree_; }
+    void increaseDegree( size_t increment = 1) { degree_ += increment; }
     size_t getDegree() const { return degree_; }
     private:
       size_t index_;
@@ -121,8 +128,8 @@ namespace TravelingSalesmanSolver {
     double secondMinElement = numeric_limits< double >::max();
     size_t minIndex = (size_t)-1;
     size_t secondMinIndex = (size_t)-1;
-    for ( size_t i = 0; i < distances.front().size(); ++i ) {
-      double value = distances.front()[ i ] + lambda[ 0 ] + lambda[ i ];
+    for ( size_t i = 0; i < distances[ 0 ].size(); ++i ) {
+      double value = distances[ 0 ][ i ] + lambda[ 0 ] + lambda[ i ];
       if ( value < secondMinElement ) {
         secondMinElement = value;
         secondMinIndex = i;
@@ -136,8 +143,7 @@ namespace TravelingSalesmanSolver {
     }
     nodes[ 0 ].addChild( minIndex );
     nodes[ 0 ].addChild( secondMinIndex );
-    nodes[ 0 ].increaseDegree();
-    nodes[ 0 ].increaseDegree();
+    nodes[ 0 ].increaseDegree( 2 );
 
     length += minElement + secondMinElement;
     return length - 2.0 * accumulate( lambda.begin(), lambda.end(), 0.0 );
@@ -172,96 +178,6 @@ namespace TravelingSalesmanSolver {
     return distance;
   }
 
-  vector< size_t > computeMinimumSpanningTreePath( const vector< vector< double > >& distances )
-  {
-    // Compute minimum spanning tree
-    vector< Vertex > nodes;
-    nodes.reserve( distances.size() );
-    for ( size_t i = 0; i < distances.size(); ++i ) {
-      nodes.push_back( Vertex( i ) );
-    }
-
-    vector< size_t > minimumSpanningTree;
-    minimumSpanningTree.reserve( distances.size() );
-    minimumSpanningTree.push_back( 0 );
-
-    vector< size_t > unusedVertices;
-    for ( size_t i = 1; i < distances.size(); ++i ) {
-      unusedVertices.push_back( i );
-    }
-
-    double length = 0.0;
-    while ( minimumSpanningTree.size() < distances.size() ) {
-      size_t fromIndex = 0;
-      size_t minIndex = 0;
-      vector< size_t >::const_iterator minIt = unusedVertices.begin();
-      double minDistance = numeric_limits< double >::max();
-      for ( size_t i = 0; i < minimumSpanningTree.size(); ++i ) {
-        size_t mstIndex = minimumSpanningTree[ i ];
-        for ( vector< size_t >::const_iterator it = unusedVertices.begin(); it != unusedVertices.end(); ++it ) {
-          double distance = distances[ mstIndex ][ *it ];
-          if ( distance < minDistance ) {
-            minIndex = *it;
-            minDistance = distance;
-            fromIndex = mstIndex;
-            minIt = it;
-          }
-        }
-      }
-      minimumSpanningTree.push_back( minIndex );
-      unusedVertices.erase( minIt );
-      length += minDistance;
-      nodes[ fromIndex ].addChild( minIndex );
-    }
-
-    set< size_t > testSet( minimumSpanningTree.begin(), minimumSpanningTree.end() );
-    assert( testSet.size() == distances.size() );
-
-    vector< size_t > path;
-    path.reserve( distances.size() );
-    vector< Vertex* > stack;
-    stack.push_back( &nodes.front() );
-    while ( stack.size() > 0 ) {
-      Vertex* v = stack.back();
-      stack.pop_back();
-      path.push_back( v->getIndex() );
-      const vector< size_t >& children = v->getChildren();
-      for ( size_t i = children.size(); i > 0; --i ) {
-        stack.push_back( &nodes[ children[ i - 1 ] ] );
-      }
-    }
-
-    return path;
-  }
-
-  vector< size_t > constructNearestNeighborPath( const vector< vector< double > >& distances )
-  {
-    vector< size_t > path;
-    path.reserve( distances.size() );
-    path.push_back( 0 );
-    set< size_t > usedNodes;
-    usedNodes.insert( 0 );
-    while ( path.size() < distances.size() ) {
-      size_t currentNode = path.back();
-      size_t minUnusedIndex = (size_t)-1;
-      double minUnusedDistance = numeric_limits< double >::max();
-      for ( size_t i = 0; i < distances.size(); ++i ) {
-        if ( usedNodes.find( i ) == usedNodes.end() ) {
-          double distance = distances[ currentNode ][ i ];
-          if ( distance < minUnusedDistance ) {
-            minUnusedIndex = i;
-            minUnusedDistance = distance;
-          }
-        }
-      }
-      assert( minUnusedIndex != (size_t)-1 );
-      path.push_back( minUnusedIndex );
-      usedNodes.insert( minUnusedIndex );
-    }
-    assertIsPath( path, distances );
-    return path;
-  }
-
   bool update3Opt( const size_t i, const size_t j, const size_t k, vector< size_t >& path, const vector< vector< double > >& distances )
   {
     assert( i < j && j < k );
@@ -269,16 +185,13 @@ namespace TravelingSalesmanSolver {
     const size_t iMinus1 = i == 0 ? path.size() - 1 : i - 1;
     const size_t pathIminus1 = path[ iMinus1 ];
     const size_t pathJ = path[ j ];
-    const size_t jMinus1 = j - 1;
-    const size_t pathJminus1 = path[ jMinus1 ];
+    const size_t pathJminus1 = path[ j - 1 ];
     const size_t pathK = path[ k ];
-    const size_t kMinus1 = k - 1;
-    const size_t pathKminus1 = path[ kMinus1 ];
-    // subtract a little something to avoid numerical errors
+    const size_t pathKminus1 = path[ k - 1 ];
     const double eps = 1e-9;
     const double removedDistance = distances[ pathIminus1 ][ pathI ] +
                                    distances[ pathJminus1 ][ pathJ ] +
-                                   distances[ pathKminus1 ][ pathK ] - eps;
+                                   distances[ pathKminus1 ][ pathK ] - eps; // subtract a little something to avoid numerical errors
 
     if ( distances[ pathJminus1 ][ pathK ] +
          distances[ pathIminus1 ][ pathKminus1 ] +
@@ -289,7 +202,7 @@ namespace TravelingSalesmanSolver {
       for ( size_t idx = k; idx < i + path.size(); ++idx, ++pathIdx ) {
         path[ pathIdx ] = pathCopy[ idx % path.size() ];
       }
-      for ( size_t idx = kMinus1; idx >= j; --idx, ++pathIdx ) {
+      for ( size_t idx = k - 1; idx >= j; --idx, ++pathIdx ) {
         path[ pathIdx ] = pathCopy[ idx ];
       }
       assert( pathIdx == path.size() );
@@ -319,7 +232,7 @@ namespace TravelingSalesmanSolver {
       vector< size_t > pathCopy( path );
       copy( pathCopy.begin() + i, pathCopy.begin() + j, path.begin() );
       size_t pathIdx = j - i;
-      for ( size_t idx = kMinus1; idx >= j; --idx, ++pathIdx ) {
+      for ( size_t idx = k - 1; idx >= j; --idx, ++pathIdx ) {
         path[ pathIdx ] = pathCopy[ idx ];
       }
       for ( size_t idx = i + path.size() - 1; idx >= k; --idx, ++pathIdx ) {
@@ -430,7 +343,6 @@ namespace TravelingSalesmanSolver {
     }
   }
 
-
   /*
   void computeLinKernighanPath( vector< size_t >& path, const vector< vector< double > >& distances )
   {
@@ -492,28 +404,19 @@ namespace TravelingSalesmanSolver {
     }
   }
   */
+} // anonymous namespace
 
+namespace TravelingSalesmanSolver {
   vector< size_t > computePath( const vector< vector< double > >& distances )
   {
-    nSteps = 0;
     assert( distances.size() > 0 );
-    assert( distances.size() < RAND_MAX );
     srand( 1729 );
     for ( size_t i = 0; i < distances.size(); ++i ) {
       assert( distances.size() == distances[ i ].size() );
     }
-    vector< size_t > path( distances.size() );
-    for ( size_t i = 0; i < distances.size(); ++i ) {
-      path[ i ] = i;
-    }
-
-    for ( size_t i = 0; i < distances.size(); ++i ) {
-      size_t ind1 = rand() % distances.size();
-      size_t ind2 = rand() % distances.size();
-      swap( path[ ind1 ], path[ ind2 ] );
-    }
-    vector< size_t > pathNN = constructNearestNeighborPath( distances );
-    vector< size_t > path2( pathNN );
+    vector< size_t > pathRand = getRandomPath( distances );
+    vector< size_t > pathNN = getNearestNeighborPath( distances );
+    vector< size_t > path( pathNN );
     vector< size_t > path3( path );
 
     cerr << "Initial distance: " << getLength( path, distances ) << endl;
@@ -528,29 +431,24 @@ namespace TravelingSalesmanSolver {
 
     if ( true ) {
       double start( clock() );
-      vector< size_t > mstPath = computeMinimumSpanningTreePath( distances );
+      compute2OptPath( path, distances );
       double time( ( clock() - start ) / CLOCKS_PER_SEC );
-      cerr << "mst path distance: " << getLength( mstPath, distances ) << ", time: " << setprecision( 4 ) << time << endl;
-      assertIsPath( mstPath, distances );
+      cerr << "2-opt path distance: " << getLength( path, distances ) << ", time: " << setprecision( 4 ) << time << endl;
+      assertIsPath( path, distances );
     }
 
     if ( true ) {
       double start( clock() );
-      compute2OptPath( path2, distances );
+      compute3OptPath( path, distances );
       double time( ( clock() - start ) / CLOCKS_PER_SEC );
-      cerr << "2-opt path distance: " << getLength( path2, distances ) << ", time: " << setprecision( 4 ) << time << endl;
-      assertIsPath( path2, distances );
+      cerr << "3-opt path distance: " << getLength( path, distances ) << ", time: " << setprecision( 4 ) << time << endl;
+      assertIsPath( path, distances );
     }
 
-    if ( true ) {
-      double start( clock() );
-      compute3OptPath( path2, distances );
-      double time( ( clock() - start ) / CLOCKS_PER_SEC );
-      cerr << "3-opt path distance: " << getLength( path2, distances ) << ", time: " << setprecision( 4 ) << time << endl;
-      assertIsPath( path2, distances );
+    if ( false ) {
+      compute2OptPathRandom( path, distances );
+      compute3OptPathRandom( path, distances );
     }
-
-    assertIsPath( path, distances );
 
     return path;
   }
