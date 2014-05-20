@@ -2,7 +2,9 @@
 #include <assert.h>
 //#include <cmath>
 #include <cstdlib>
+#include <ctime>
 #include <iostream>
+#include <iomanip>
 #include <limits>
 //#include <numeric>
 //#include <stdexcept>
@@ -58,6 +60,15 @@ namespace TravelingSalesmanSolver {
     }
     length += minElement + secondMinElement;
     return length;
+  }
+
+  double getSubpathLength( vector< size_t > path, size_t i, size_t j, const vector< vector< double > >& distances )
+  {
+    double distance = 0.0;
+    for ( size_t k = i; k < j; ++k ) {
+      distance += distances[ path[ k ] ][ path[ k + 1 ] ];
+    }
+    return distance;
   }
 
   double getLength( vector< size_t > path, const vector< vector< double > >& distances )
@@ -140,77 +151,59 @@ namespace TravelingSalesmanSolver {
     return path;
   }
 
+  void compute2ExchangePath( vector< size_t >& path, const vector< vector< double > >& distances )
+  {
+    assert( path.size() == distances.size() );
+    double bestDistance = getLength( path, distances );
+    bool changed = true;
+    while ( changed ) {
+      changed = false;
+      for ( size_t i = 0; i < path.size(); ++i ) {
+        for ( size_t j = i + 1; j < path.size(); ++j ) {
+          swap( path[ i ], path[ j ] );
+          double distance = getLength( path, distances );
+          if ( distance > bestDistance ) {
+            swap( path[ i ], path[ j ] );
+          }
+          else {
+            bestDistance = distance;
+            changed = true;
+            break;
+          }
+        }
+      }
+    }
+  }
+
   void compute2OptPath( vector< size_t >& path, const vector< vector< double > >& distances )
   {
-    assert( path.size() == distances.size() );
-    double bestDistance = getLength( path, distances );
     bool changed = true;
     while ( changed ) {
       changed = false;
       for ( size_t i = 0; i < path.size(); ++i ) {
         for ( size_t j = i + 1; j < path.size(); ++j ) {
-          swap( path[ i ], path[ j ] );
-          double distance = getLength( path, distances );
-          if ( distance > bestDistance ) {
-            swap( path[ i ], path[ j ] );
+          if ( i < 2 && j + 1 == path.size() ) {
+            continue;
           }
-          else {
-            bestDistance = distance;
-            changed = true;
-            break;
-          }
-        }
-      }
-    }
-  }
-
-  void compute3OptPath( vector< size_t >& path, const vector< vector< double > >& distances )
-  {
-    assert( path.size() == distances.size() );
-    double bestDistance = getLength( path, distances );
-    for ( size_t i = 0; i < path.size(); ++i ) {
-      for ( size_t j = i + 1; j < path.size(); ++j ) {
-        for ( size_t k = j + 1; k < path.size(); ++k ) {
-          swap( path[ i ], path[ j ] );
-          swap( path[ j ], path[ k ] );
-          double distance = getLength( path, distances );
-          if ( distance > bestDistance ) {
-            swap( path[ i ], path[ j ] );
-          }
-          else {
-            bestDistance = distance;
-          }
-        }
-      }
-    }
-  }
-
-  void compute2Reverse( vector< size_t >& path, const vector< vector< double > >& distances )
-  {
-    double bestDistance = getLength( path, distances );
-    bool changed = true;
-    while ( changed ) {
-      changed = false;
-      for ( size_t i = 0; i < path.size(); ++i ) {
-        for ( size_t j = i + 1; j < path.size(); ++j ) {
-          reverse( path.begin() + i, path.begin() + j + 1 );
-          double distance = getLength( path, distances );
-          if ( distance < bestDistance ) {
-            bestDistance = distance;
-            changed = true;
-            break;
-          }
-          else {
+          const size_t pathI = path[ i ];
+          const size_t pathJ = path[ j ];
+          const size_t pathJplus1 = path[ j + 1 == path.size() ? 0 : j + 1 ];
+          const size_t pathIminus1 = path[ i == 0 ? path.size() - 1 : i - 1 ];
+          const double deltaDistance =
+            distances[ pathIminus1 ][ pathJ ] + distances[ pathI ][ pathJplus1 ] -
+            distances[ pathIminus1 ][ pathI ] - distances[ pathJ ][ pathJplus1 ];
+          if ( deltaDistance < 0.0 ) {
             reverse( path.begin() + i, path.begin() + j + 1 );
+            changed = true;
+            break;
           }
         }
       }
     }
   }
 
-  void compute2ReverseRandom( vector< size_t >& path, const vector< vector< double > >& distances )
+  void compute2OptPathRandom( vector< size_t >& path, const vector< vector< double > >& distances )
   {
-    double bestDistance = getLength( path, distances );
     bool changed = true;
     size_t outerIter = 0;
     while ( changed && outerIter < 100 ) {
@@ -224,20 +217,24 @@ namespace TravelingSalesmanSolver {
           continue;
         }
         sort( randNums.begin(), randNums.end() );
-        reverse( path.begin() + randNums[ 0 ], path.begin() + randNums[ 1 ] + 1 );
-        double distance = getLength( path, distances );
-        if ( distance < bestDistance ) {
-          bestDistance = distance;
-          changed = true;
-        }
-        else {
+        const size_t i = randNums[ 0 ];
+        const size_t j = randNums[ 1 ];
+        const size_t pathI = path[ i ];
+        const size_t pathJ = path[ j ];
+        const size_t pathJplus1 = path[ j + 1 == path.size() ? 0 : j + 1 ];
+        const size_t pathIminus1 = path[ i == 0 ? path.size() - 1 : i - 1 ];
+        const double deltaDistance =
+          distances[ pathIminus1 ][ pathJ ] + distances[ pathI ][ pathJplus1 ] -
+          distances[ pathIminus1 ][ pathI ] - distances[ pathJ ][ pathJplus1 ];
+        if ( deltaDistance < 0.0 ) {
           reverse( path.begin() + randNums[ 0 ], path.begin() + randNums[ 1 ] + 1 );
+          changed = true;
         }
       }
     }
   }
 
-  void compute3ReverseRandom( vector< size_t >& path, const vector< vector< double > >& distances )
+  void compute3OptPathRandom( vector< size_t >& path, const vector< vector< double > >& distances )
   {
     double bestDistance = getLength( path, distances );
     bool changed = true;
@@ -254,6 +251,7 @@ namespace TravelingSalesmanSolver {
         if ( randNums[ 0 ] == randNums[ 1 ] || randNums[ 1 ] == randNums[ 2 ] || randNums[ 0 ] + 1 == randNums[ 1 ] ) {
           continue;
         }
+
         reverse( path.begin() + randNums[ 0 ], path.begin() + randNums[ 1 ] );
         double distance1 = getLength( path, distances );
         if ( distance1 < bestDistance ) {
@@ -280,7 +278,7 @@ namespace TravelingSalesmanSolver {
     }
   }
 
-  void compute3Reverse( vector< size_t >& path, const vector< vector< double > >& distances )
+  void compute3OptPath( vector< size_t >& path, const vector< vector< double > >& distances )
   {
     double bestDistance = getLength( path, distances );
     bool changed = true;
@@ -353,30 +351,46 @@ namespace TravelingSalesmanSolver {
     vector< size_t > path2( path );
     vector< size_t > path3( path );
 
-    cerr << "1-tree distance: ";
-    cerr << oneTreeLength( distances ) << endl;
     cerr << "Initial distance: " << getLength( path, distances ) << endl;
-//    compute2OptPath( path, distances );
-//    double twoOptDistance = getLength( path, distances );
-//    cerr << "2-opt distance: " << twoOptDistance << endl;
-    vector< size_t > mstPath = computeMinimumSpanningTreePath( distances );
-    cerr << "mst path distance : " << getLength( mstPath, distances ) << endl;
-    assertIsPath( mstPath, distances );
-//    compute2OptPath( mstPath, distances );
-//    cerr << "2-opt mst path distance : " << getLength( mstPath, distances ) << endl;
-    compute2Reverse( path2, distances );
-    cerr << "2-reverse path distance : " << getLength( path2, distances ) << endl;
-    assertIsPath( path2, distances );
+    if ( false ) {
+      cerr << "1-tree distance: ";
+      double start( clock() );
+      double oneTreeL = oneTreeLength( distances );
+      double time( ( clock() - start ) / CLOCKS_PER_SEC );
+      cerr << oneTreeL << ", time: " << setprecision( 4 ) << time << endl;
+    }
 
-//    compute2OptPath( path2, distances );
-//    cerr << "2-opt 2-reverse path distance : " << getLength( path2, distances ) << endl;
+//    compute2ExchangePath( path, distances );
+//    cerr << "2-exchange distance: " << getLength( path, distances ) << endl;
+    if ( true ) {
+      double start( clock() );
+      vector< size_t > mstPath = computeMinimumSpanningTreePath( distances );
+      double time( ( clock() - start ) / CLOCKS_PER_SEC );
+      cerr << "mst path distance: " << getLength( mstPath, distances ) << ", time: " << setprecision( 4 ) << time << endl;
+      assertIsPath( mstPath, distances );
+//    compute2ExchangePath( mstPath, distances );
+//    cerr << "2-exchange mst path distance: " << getLength( mstPath, distances ) << endl;
+    }
+    if ( true ) {
+      double start( clock() );
+      vector< size_t > path = computePath( distances );
+      compute2OptPath( path2, distances );
+      double time( ( clock() - start ) / CLOCKS_PER_SEC );
+      cerr << "2-opt path distance: " << getLength( path2, distances ) << ", time: " << setprecision( 4 ) << time << endl;
+      assertIsPath( path2, distances );
+//    compute2ExchangePath( path2, distances );
+//    cerr << "2-exchange 2-opt path distance: " << getLength( path2, distances ) << endl;
+    }
 
-    compute3ReverseRandom( path3, distances );
-    cerr << "3-reverse path distance : " << getLength( path3, distances ) << endl;
-    assertIsPath( path3, distances );
-
-    compute2OptPath( path3, distances );
-    cerr << "2-opt 3-reverse path distance : " << getLength( path3, distances ) << endl;
+    if ( false ) {
+      double start( clock() );
+      compute3OptPathRandom( path3, distances );
+      double time( ( clock() - start ) / CLOCKS_PER_SEC );
+      cerr << "3-opt path random distance: " << getLength( path3, distances ) << ", time: " << setprecision( 4 ) << time << endl;
+      assertIsPath( path3, distances );
+      compute2OptPath( path3, distances );
+      cerr << "2-exchange 3-opt path distance: " << getLength( path3, distances ) << endl;
+    }
 
     assertIsPath( path, distances );
 

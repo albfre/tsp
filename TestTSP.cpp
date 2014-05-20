@@ -1,6 +1,8 @@
 #include <algorithm>
 #include <assert.h>
+#include <cmath>
 #include <cstdlib>
+#include <ctime>
 #include <iostream>
 #include <iomanip>
 #include <sstream>
@@ -14,7 +16,7 @@
 using namespace std;
 using namespace TravelingSalesmanSolver;
 
-double distance( const vector< double >& point1, const vector< double >& point2 )
+double computeDistance( const vector< double >& point1, const vector< double >& point2 )
 {
   assert( point1.size() == point2.size() );
   double dist = 0.0;
@@ -35,7 +37,7 @@ void testTSP( size_t numOfPoints )
   vector< vector< double > > distances( numOfPoints, vector< double >( numOfPoints ) );
   for ( size_t i = 0; i < numOfPoints; ++i ) {
     for ( size_t j = i + 1; j < numOfPoints; ++j ) {
-      distances[ i ][ j ] = distance( points[ i ], points[ j ] );
+      distances[ i ][ j ] = computeDistance( points[ i ], points[ j ] );
       distances[ j ][ i ] = distances[ i ][ j ];
     }
   }
