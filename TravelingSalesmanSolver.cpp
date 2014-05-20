@@ -362,7 +362,7 @@ namespace TravelingSalesmanSolver {
 
 //    compute2ExchangePath( path, distances );
 //    cerr << "2-exchange distance: " << getLength( path, distances ) << endl;
-    if ( true ) {
+    if ( false ) {
       double start( clock() );
       vector< size_t > mstPath = computeMinimumSpanningTreePath( distances );
       double time( ( clock() - start ) / CLOCKS_PER_SEC );
@@ -371,9 +371,9 @@ namespace TravelingSalesmanSolver {
 //    compute2ExchangePath( mstPath, distances );
 //    cerr << "2-exchange mst path distance: " << getLength( mstPath, distances ) << endl;
     }
+
     if ( true ) {
       double start( clock() );
-      vector< size_t > path = computePath( distances );
       compute2OptPath( path2, distances );
       double time( ( clock() - start ) / CLOCKS_PER_SEC );
       cerr << "2-opt path distance: " << getLength( path2, distances ) << ", time: " << setprecision( 4 ) << time << endl;
