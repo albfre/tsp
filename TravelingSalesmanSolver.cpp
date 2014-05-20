@@ -14,8 +14,8 @@
 using namespace std;
 
 namespace {
-  void assertIsPath( const vector< size_t >& path,
-                     const vector< vector< double > >& distances )
+  void assertIsPath_( const vector< size_t >& path,
+                      const vector< vector< double > >& distances )
   {
     assert( path.size() == distances.size() );
     vector< size_t > pathCopy( path );
@@ -28,7 +28,7 @@ namespace {
     }
   }
 
-  vector< size_t > getRandomPath( const vector< vector< double > >& distances )
+  vector< size_t > getRandomPath_( const vector< vector< double > >& distances )
   {
     vector< size_t > path( distances.size() );
     for ( size_t i = 0; i < distances.size(); ++i ) {
@@ -43,7 +43,7 @@ namespace {
     return path;
   }
 
-  vector< size_t > getNearestNeighborPath( const vector< vector< double > >& distances )
+  vector< size_t > getNearestNeighborPath_( const vector< vector< double > >& distances )
   {
     vector< size_t > path;
     path.reserve( distances.size() );
@@ -68,7 +68,7 @@ namespace {
       path.push_back( minUnusedIndex );
       usedNodes.insert( minUnusedIndex );
     }
-    assertIsPath( path, distances );
+    assertIsPath_( path, distances );
     return path;
   }
 
@@ -85,9 +85,9 @@ namespace {
       vector< size_t > children_;
   };
 
-  double getOneTree( vector< Vertex >& nodes,
-                     const vector< vector< double > >& distances,
-                     const vector< double >& lambda )
+  double get1Tree_( vector< Vertex >& nodes,
+                    const vector< vector< double > >& distances,
+                    const vector< double >& lambda )
   {
     // Compute minimum spanning tree of the vertices excluding the first
     nodes.clear();
@@ -152,7 +152,7 @@ namespace {
     return length - 2.0 * accumulate( lambda.begin(), lambda.end(), 0.0 );
   }
 
-  double getHeldKarpLowerBound( const vector< vector< double > >& distances )
+  double getHeldKarpLowerBound_( const vector< vector< double > >& distances )
   {
     double bestLength = numeric_limits< double >::min();
     double length = numeric_limits< double >::min();
@@ -160,7 +160,7 @@ namespace {
     double delta = 3e-3;
     for ( size_t i = 0; i < 10; ++i ) {
       vector< Vertex > nodes;
-      length = getOneTree( nodes, distances, lambda );
+      length = get1Tree_( nodes, distances, lambda );
       bestLength = max( bestLength, length );
       for ( size_t j = 0; j < lambda.size(); ++j ) {
         lambda[ j ] += ( int( nodes[ j ].getDegree() ) - 2 ) * delta;
@@ -171,8 +171,8 @@ namespace {
     return bestLength;
   }
 
-  double getLength( vector< size_t > path,
-                    const vector< vector< double > >& distances )
+  double getLength_( vector< size_t > path,
+                     const vector< vector< double > >& distances )
   {
     double distance = 0.0;
     for ( size_t i = 0; i + 1 < path.size(); ++i ) {
@@ -182,11 +182,50 @@ namespace {
     return distance;
   }
 
-  bool update3Opt( const size_t i,
-                   const size_t j,
-                   const size_t k,
-                   vector< size_t >& path,
-                   const vector< vector< double > >& distances )
+  void update3OptIntervals_( vector< size_t >& path,
+                             size_t i1Begin, size_t i1End, bool reverseI1,
+                             size_t i2Begin, size_t i2End, bool reverseI2,
+                             size_t i3Begin, size_t i3End, bool reverseI3,
+                             const vector< vector< double > >& distances )
+  {
+    vector< size_t > pathCopy( path );
+    size_t pathIdx = 0;
+    for ( size_t i = 0; i < 3; ++i ) {
+      size_t iBegin;
+      size_t iEnd;
+      bool reverse;
+      switch ( i ) {
+        case 0: iBegin = i1Begin; iEnd = i1End; reverse = reverseI1; break;
+        case 1: iBegin = i2Begin; iEnd = i2End; reverse = reverseI2; break;
+        case 2: iBegin = i3Begin; iEnd = i3End; reverse = reverseI3; break;
+        default: assert( false ); iBegin = 0; iEnd = 0; reverse = false;
+      }
+      if ( reverse ) {
+        if ( iBegin < iEnd ) {
+          iBegin += path.size();
+        }
+        for ( size_t idx = iBegin; idx > iEnd; --idx, ++pathIdx ) {
+          path[ pathIdx ] = pathCopy[ idx % path.size() ];
+        }
+      }
+      else {
+        if ( iEnd < iBegin ) {
+          iEnd += path.size();
+        }
+        for ( size_t idx = iBegin; idx < iEnd; ++idx, ++pathIdx ) {
+          path[ pathIdx ] = pathCopy[ idx % path.size() ];
+        }
+      }
+    }
+    assert( pathIdx == path.size() );
+    assert( getLength_( path, distances ) < getLength_( pathCopy, distances ) );
+  }
+
+  bool update3Opt_( const size_t i,
+                    const size_t j,
+                    const size_t k,
+                    vector< size_t >& path,
+                    const vector< vector< double > >& distances )
   {
     assert( i < j && j < k );
     const size_t pathI = path[ i ];
@@ -204,58 +243,27 @@ namespace {
     if ( distances[ pathJminus1 ][ pathK ] +
          distances[ pathIminus1 ][ pathKminus1 ] +
          distances[ pathJ ][ pathI ] < removedDistance ) {
-      vector< size_t > pathCopy( path );
-      copy( pathCopy.begin() + i, pathCopy.begin() + j, path.begin() );
-      size_t pathIdx = j - i;
-      for ( size_t idx = k; idx < i + path.size(); ++idx, ++pathIdx ) {
-        path[ pathIdx ] = pathCopy[ idx % path.size() ];
-      }
-      for ( size_t idx = k - 1; idx >= j; --idx, ++pathIdx ) {
-        path[ pathIdx ] = pathCopy[ idx ];
-      }
-      assert( pathIdx == path.size() );
-      assert( getLength( path, distances ) < getLength( pathCopy, distances ) );
+      update3OptIntervals_( path, i, j, false, k, i, false, k - 1, j - 1, true, distances );
       return true;
     }
-
     if ( distances[ pathJminus1 ][ pathIminus1 ] +
          distances[ pathK ][ pathJ ] +
          distances[ pathKminus1 ][ pathI ] < removedDistance ) {
-      vector< size_t > pathCopy( path );
-      copy( pathCopy.begin() + i, pathCopy.begin() + j, path.begin() );
-      size_t pathIdx = j - i;
-      for ( size_t idx = i + path.size() - 1; idx >= k; --idx, ++pathIdx ) {
-        path[ pathIdx ] = pathCopy[ idx % path.size() ];
-      }
-      copy( pathCopy.begin() + j, pathCopy.begin() + k, path.begin() + pathIdx );
-      pathIdx += k - j;
-      assert( pathIdx == path.size() );
-      assert( getLength( path, distances ) < getLength( pathCopy, distances ) );
+      update3OptIntervals_( path, i, j, false, i + path.size() - 1, k - 1, true, j, k, false, distances );
       return true;
     }
-
     if ( distances[ pathJminus1 ][ pathKminus1 ] +
          distances[ pathJ ][ pathIminus1 ] +
          distances[ pathK ][ pathI ] < removedDistance ) {
-      vector< size_t > pathCopy( path );
-      copy( pathCopy.begin() + i, pathCopy.begin() + j, path.begin() );
-      size_t pathIdx = j - i;
-      for ( size_t idx = k - 1; idx >= j; --idx, ++pathIdx ) {
-        path[ pathIdx ] = pathCopy[ idx ];
-      }
-      for ( size_t idx = i + path.size() - 1; idx >= k; --idx, ++pathIdx ) {
-        path[ pathIdx ] = pathCopy[ idx % path.size() ];
-      }
-      assert( pathIdx == path.size() );
-      assert( getLength( path, distances ) < getLength( pathCopy, distances ) );
+      update3OptIntervals_( path, i, j, false, k - 1, j - 1, true, i + path.size() - 1, k - 1, true, distances );
       return true;
     }
 
     return false;
   }
 
-  void compute3OptPathRandom( vector< size_t >& path,
-                              const vector< vector< double > >& distances )
+  void compute3OptPathRandom_( vector< size_t >& path,
+                               const vector< vector< double > >& distances )
   {
     bool changed = true;
     size_t outerIter = 0;
@@ -271,15 +279,15 @@ namespace {
         if ( randNums[ 0 ] == randNums[ 1 ] || randNums[ 1 ] == randNums[ 2 ] ) {
           continue;
         }
-        if ( update3Opt( randNums[ 0 ], randNums[ 1 ], randNums[ 2 ], path, distances ) ) {
+        if ( update3Opt_( randNums[ 0 ], randNums[ 1 ], randNums[ 2 ], path, distances ) ) {
           changed = true;
         }
       }
     }
   }
 
-  void compute3OptPath( vector< size_t >& path,
-                        const vector< vector< double > >& distances )
+  void compute3OptPath_( vector< size_t >& path,
+                         const vector< vector< double > >& distances )
   {
     bool changed = true;
     while ( changed ) {
@@ -287,7 +295,7 @@ namespace {
       for ( size_t i = 0; i < path.size(); ++i ) {
         for ( size_t j = i + 1; j < path.size(); ++j ) {
           for ( size_t k = j + 1; k < path.size(); ++k ) {
-            if ( update3Opt( i, j, k, path, distances ) ) {
+            if ( update3Opt_( i, j, k, path, distances ) ) {
               changed = true;
               break;
             }
@@ -297,10 +305,10 @@ namespace {
     }
   }
 
-  bool update2Opt( size_t i,
-                   size_t j,
-                   vector< size_t >& path,
-                   const vector< vector< double > >& distances )
+  bool update2Opt_( size_t i,
+                    size_t j,
+                    vector< size_t >& path,
+                    const vector< vector< double > >& distances )
   {
     if ( i < 2 && j + 1 == path.size() ) {
       return false;
@@ -318,8 +326,8 @@ namespace {
     return false;
   }
 
-  void compute2OptPathRandom( vector< size_t >& path,
-                              const vector< vector< double > >& distances )
+  void compute2OptPathRandom_( vector< size_t >& path,
+                               const vector< vector< double > >& distances )
   {
     bool changed = true;
     size_t outerIter = 0;
@@ -334,22 +342,22 @@ namespace {
           continue;
         }
         sort( randNums.begin(), randNums.end() );
-        if ( update2Opt( randNums[ 0 ], randNums[ 1 ], path, distances ) ) {
+        if ( update2Opt_( randNums[ 0 ], randNums[ 1 ], path, distances ) ) {
           changed = true;
         }
       }
     }
   }
 
-  void compute2OptPath( vector< size_t >& path,
-                        const vector< vector< double > >& distances )
+  void compute2OptPath_( vector< size_t >& path,
+                         const vector< vector< double > >& distances )
   {
     bool changed = true;
     while ( changed ) {
       changed = false;
       for ( size_t i = 0; i < path.size(); ++i ) {
         for ( size_t j = i + 1; j < path.size(); ++j ) {
-          if ( update2Opt( i, j, path, distances ) ) {
+          if ( update2Opt_( i, j, path, distances ) ) {
             changed = true;
             break;
           }
@@ -359,8 +367,8 @@ namespace {
   }
 
   /*
-  void computeLinKernighanPath( vector< size_t >& path,
-                                const vector< vector< double > >& distances )
+  void computeLinKernighanPath_( vector< size_t >& path,
+                                 const vector< vector< double > >& distances )
   {
     bool changed = true;
     vector< pair< size_t, size_t > > x;
@@ -430,40 +438,40 @@ namespace TravelingSalesmanSolver {
     for ( size_t i = 0; i < distances.size(); ++i ) {
       assert( distances.size() == distances[ i ].size() );
     }
-    vector< size_t > pathRand = getRandomPath( distances );
-    vector< size_t > pathNN = getNearestNeighborPath( distances );
+    vector< size_t > pathRand = getRandomPath_( distances );
+    vector< size_t > pathNN = getNearestNeighborPath_( distances );
     vector< size_t > path( pathNN );
     vector< size_t > path3( path );
 
-    cerr << "Initial distance: " << getLength( path, distances ) << endl;
-    cerr << "Nearest neighbor distance: " << getLength( pathNN, distances ) << endl;
+    cerr << "Initial distance: " << getLength_( path, distances ) << endl;
+    cerr << "Nearest neighbor distance: " << getLength_( pathNN, distances ) << endl;
     if ( true ) {
       cerr << "1-tree distance: ";
       double start( clock() );
-      double lowerBound = getHeldKarpLowerBound( distances );
+      double lowerBound = getHeldKarpLowerBound_( distances );
       double time( ( clock() - start ) / CLOCKS_PER_SEC );
       cerr << lowerBound << ", time: " << setprecision( 4 ) << time << endl;
     }
 
     if ( true ) {
       double start( clock() );
-      compute2OptPath( path, distances );
+      compute2OptPath_( path, distances );
       double time( ( clock() - start ) / CLOCKS_PER_SEC );
-      cerr << "2-opt path distance: " << getLength( path, distances ) << ", time: " << setprecision( 4 ) << time << endl;
-      assertIsPath( path, distances );
+      cerr << "2-opt path distance: " << getLength_( path, distances ) << ", time: " << setprecision( 4 ) << time << endl;
+      assertIsPath_( path, distances );
     }
 
     if ( true ) {
       double start( clock() );
-      compute3OptPath( path, distances );
+      compute3OptPath_( path, distances );
       double time( ( clock() - start ) / CLOCKS_PER_SEC );
-      cerr << "3-opt path distance: " << getLength( path, distances ) << ", time: " << setprecision( 4 ) << time << endl;
-      assertIsPath( path, distances );
+      cerr << "3-opt path distance: " << getLength_( path, distances ) << ", time: " << setprecision( 4 ) << time << endl;
+      assertIsPath_( path, distances );
     }
 
     if ( false ) {
-      compute2OptPathRandom( path, distances );
-      compute3OptPathRandom( path, distances );
+      compute2OptPathRandom_( path, distances );
+      compute3OptPathRandom_( path, distances );
     }
 
     return path;
