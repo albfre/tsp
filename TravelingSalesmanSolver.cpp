@@ -80,42 +80,41 @@ namespace TravelingSalesmanSolver {
   double getOneTree( vector< Vertex >& nodes, const vector< vector< double > >& distances, const vector< double >& lambda )
   {
     // Compute minimum spanning tree of the vertices excluding the first
-    vector< size_t > minimumSpanningTree;
-    minimumSpanningTree.reserve( distances.size() );
-    minimumSpanningTree.push_back( 1 );
     nodes.clear();
     for ( size_t i = 0; i < distances.size(); ++i ) {
       nodes.push_back( Vertex( i ) );
     }
 
-
-    set< size_t > unusedVertices;
+    vector< size_t > minimumSpanningTree;
+    minimumSpanningTree.reserve( distances.size() );
+    minimumSpanningTree.push_back( 1 );
+    vector< size_t > unusedVertices;
     for ( size_t i = 2; i < distances.size(); ++i ) {
-      unusedVertices.insert( i );
+      unusedVertices.push_back( i );
     }
 
     double length = 0.0;
     while ( minimumSpanningTree.size() + 1 < distances.size() ) {
       size_t fromIndex = 0;
-      size_t minIndex = 0;
+      vector< size_t >::const_iterator minIt = unusedVertices.begin();
       double minDistance = numeric_limits< double >::max();
       for ( size_t i = 0; i < minimumSpanningTree.size(); ++i ) {
         size_t mstIndex = minimumSpanningTree[ i ];
-        for ( set< size_t >::const_iterator it = unusedVertices.begin(); it != unusedVertices.end(); ++it ) {
+        for ( vector< size_t >::const_iterator it = unusedVertices.begin(); it != unusedVertices.end(); ++it ) {
           double distance = distances[ mstIndex ][ *it ] + lambda[ mstIndex ] + lambda[ *it ];
           if ( distance < minDistance ) {
-            minIndex = *it;
             minDistance = distance;
             fromIndex = mstIndex;
+            minIt = it;
           }
         }
       }
-      minimumSpanningTree.push_back( minIndex );
-      unusedVertices.erase( minIndex );
+      minimumSpanningTree.push_back( *minIt );
       length += minDistance;
-      nodes[ fromIndex ].addChild( minIndex );
+      nodes[ fromIndex ].addChild( *minIt );
       nodes[ fromIndex ].increaseDegree();
-      nodes[ minIndex ].increaseDegree();
+      nodes[ *minIt ].increaseDegree();
+      unusedVertices.erase( minIt );
     }
 
     double minElement = numeric_limits< double >::max();
@@ -146,26 +145,21 @@ namespace TravelingSalesmanSolver {
 
   double getHeldKarpLowerBound( const vector< vector< double > >& distances )
   {
+    double bestLength = numeric_limits< double >::min();
     double length = numeric_limits< double >::min();
     vector< double > lambda( distances.size() );
     double delta = 3e-3;
     for ( size_t i = 0; i < 10; ++i ) {
       vector< Vertex > nodes;
       length = getOneTree( nodes, distances, lambda );
+      bestLength = max( bestLength, length );
       for ( size_t j = 0; j < lambda.size(); ++j ) {
-        size_t degree = nodes[ j ].getDegree();
-        if ( degree == 1 ) {
-          lambda[ j ] -= delta;
-        }
-        else if ( degree > 2 ) {
-          lambda[ j ] += ( degree - 2 ) * delta;
-        }
+        lambda[ j ] += ( int( nodes[ j ].getDegree() ) - 2 ) * delta;
       }
-      cerr << length << endl;
-      delta *= 0.9;
+      delta *= 0.95;
     }
 
-    return length;
+    return bestLength;
   }
 
   double getLength( vector< size_t > path, const vector< vector< double > >& distances )
@@ -191,29 +185,31 @@ namespace TravelingSalesmanSolver {
     minimumSpanningTree.reserve( distances.size() );
     minimumSpanningTree.push_back( 0 );
 
-    set< size_t > unusedVertices;
+    vector< size_t > unusedVertices;
     for ( size_t i = 1; i < distances.size(); ++i ) {
-      unusedVertices.insert( i );
+      unusedVertices.push_back( i );
     }
 
     double length = 0.0;
     while ( minimumSpanningTree.size() < distances.size() ) {
       size_t fromIndex = 0;
       size_t minIndex = 0;
+      vector< size_t >::const_iterator minIt = unusedVertices.begin();
       double minDistance = numeric_limits< double >::max();
       for ( size_t i = 0; i < minimumSpanningTree.size(); ++i ) {
         size_t mstIndex = minimumSpanningTree[ i ];
-        for ( set< size_t >::const_iterator it = unusedVertices.begin(); it != unusedVertices.end(); ++it ) {
+        for ( vector< size_t >::const_iterator it = unusedVertices.begin(); it != unusedVertices.end(); ++it ) {
           double distance = distances[ mstIndex ][ *it ];
           if ( distance < minDistance ) {
             minIndex = *it;
             minDistance = distance;
             fromIndex = mstIndex;
+            minIt = it;
           }
         }
       }
       minimumSpanningTree.push_back( minIndex );
-      unusedVertices.erase( minIndex );
+      unusedVertices.erase( minIt );
       length += minDistance;
       nodes[ fromIndex ].addChild( minIndex );
     }
@@ -530,7 +526,7 @@ namespace TravelingSalesmanSolver {
       cerr << lowerBound << ", time: " << setprecision( 4 ) << time << endl;
     }
 
-    if ( false ) {
+    if ( true ) {
       double start( clock() );
       vector< size_t > mstPath = computeMinimumSpanningTreePath( distances );
       double time( ( clock() - start ) / CLOCKS_PER_SEC );
