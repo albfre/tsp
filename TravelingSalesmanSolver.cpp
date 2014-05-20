@@ -1,3 +1,4 @@
+/* SYSTEM INCLUDES */
 #include <algorithm>
 #include <assert.h>
 #include <cmath>
@@ -70,6 +71,24 @@ namespace {
     }
     assertIsPath_( path, distances );
     return path;
+  }
+
+  vector< vector< size_t > > computeNearestNeighbors_( const vector< vector< double > >& distances,
+                                                       size_t numberOfNeighbors )
+  {
+    vector< vector< size_t > > nearestNeighbors( distances.size(), vector< size_t >( numberOfNeighbors ) );
+    vector< pair< double, size_t > > tmpNeighbors( distances.size() );
+    for ( size_t i = 0; i < distances.size(); ++i ) {
+      for ( size_t j = 0; j < distances[ i ].size(); ++j ) {
+        tmpNeighbors[ j ] = make_pair( distances[ i ][ j ], j );
+      }
+      sort( tmpNeighbors.begin(), tmpNeighbors.end() );
+      // Start from 1 to avoid adding self as neighbor
+      for ( size_t j = 1; j < numberOfNeighbors; ++j ) {
+        nearestNeighbors[ i ][ j ] = tmpNeighbors[ j ].second;
+      }
+    }
+    return nearestNeighbors;
   }
 
   struct Vertex {
@@ -217,24 +236,33 @@ namespace {
         }
       }
     }
+    if ( pathIdx != path.size() ) {
+      cerr << pathIdx << " " << path.size() << endl;
+    }
     assert( pathIdx == path.size() );
     assert( getLength_( path, distances ) < getLength_( pathCopy, distances ) );
   }
 
-  bool update3Opt_( const size_t i,
-                    const size_t j,
-                    const size_t k,
+  bool update3Opt_( size_t i,
+                    size_t j,
+                    size_t k,
                     vector< size_t >& path,
                     const vector< vector< double > >& distances )
   {
-    assert( i < j && j < k );
+    vector< size_t > nums( 3 );
+    nums[ 0 ] = i; nums[ 1 ] = j; nums[ 2 ] = k;
+    sort( nums.begin(), nums.end() );
+    i = nums[ 0 ]; j = nums[ 1 ]; k = nums[ 2 ];
+//    cerr << "ijk: " << i << " " << j << " " << k << endl;
     const size_t pathI = path[ i ];
     const size_t iMinus1 = i == 0 ? path.size() - 1 : i - 1;
     const size_t pathIminus1 = path[ iMinus1 ];
     const size_t pathJ = path[ j ];
-    const size_t pathJminus1 = path[ j - 1 ];
+    const size_t jMinus1 = j == 0 ? path.size() - 1 : j - 1;
+    const size_t pathJminus1 = path[ jMinus1 ];
     const size_t pathK = path[ k ];
-    const size_t pathKminus1 = path[ k - 1 ];
+    const size_t kMinus1 = k == 0 ? path.size() - 1 : k - 1;
+    const size_t pathKminus1 = path[ kMinus1 ];
     const double eps = 1e-9;
     const double removedDistance = distances[ pathIminus1 ][ pathI ] +
                                    distances[ pathJminus1 ][ pathJ ] +
@@ -296,6 +324,32 @@ namespace {
         for ( size_t j = i + 1; j < path.size(); ++j ) {
           for ( size_t k = j + 1; k < path.size(); ++k ) {
             if ( update3Opt_( i, j, k, path, distances ) ) {
+              changed = true;
+              break;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  void compute3OptPath_( vector< size_t >& path,
+                         const vector< vector< double > >& distances,
+                         const vector< vector< size_t > >& nearestNeighbors )
+  {
+    bool changed = true;
+    while ( changed ) {
+      changed = false;
+      for ( size_t i = 0; i < path.size(); ++i ) {
+        for ( size_t j = 0; j < nearestNeighbors[ i ].size(); ++j ) {
+          if ( nearestNeighbors[ i ][ j ] == i ) {
+            continue;
+          }
+          for ( size_t k = 0; k < nearestNeighbors[ j ].size(); ++k ) {
+            if ( nearestNeighbors[ j ][ k ] == i || nearestNeighbors[ j ][ k ] == j || nearestNeighbors[ i ][ j ] == nearestNeighbors[ j ][ k ] ) {
+              continue;
+            }
+            if ( update3Opt_( i, nearestNeighbors[ i ][ j ], nearestNeighbors[ j ][ k ], path, distances ) ) {
               changed = true;
               break;
             }
@@ -442,6 +496,7 @@ namespace TravelingSalesmanSolver {
     vector< size_t > pathNN = getNearestNeighborPath_( distances );
     vector< size_t > path( pathNN );
     vector< size_t > path3( path );
+    vector< vector< size_t > > nearestNeighbors = computeNearestNeighbors_( distances, 21 );
 
     cerr << "Initial distance: " << getLength_( path, distances ) << endl;
     cerr << "Nearest neighbor distance: " << getLength_( pathNN, distances ) << endl;
@@ -463,7 +518,7 @@ namespace TravelingSalesmanSolver {
 
     if ( true ) {
       double start( clock() );
-      compute3OptPath_( path, distances );
+      compute3OptPath_( path, distances, nearestNeighbors );
       double time( ( clock() - start ) / CLOCKS_PER_SEC );
       cerr << "3-opt path distance: " << getLength_( path, distances ) << ", time: " << setprecision( 4 ) << time << endl;
       assertIsPath_( path, distances );
