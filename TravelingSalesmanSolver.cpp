@@ -352,7 +352,7 @@ namespace TravelingSalesmanSolver {
     vector< size_t > path3( path );
 
     cerr << "Initial distance: " << getLength( path, distances ) << endl;
-    if ( false ) {
+    if ( true ) {
       cerr << "1-tree distance: ";
       double start( clock() );
       double oneTreeL = oneTreeLength( distances );
