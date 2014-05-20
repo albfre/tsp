@@ -64,12 +64,30 @@ namespace TravelingSalesmanSolver {
     }
   }
 
-  double oneTreeLength( const vector< vector< double > >& distances )
+  struct Vertex {
+    Vertex( size_t index ) : index_( index ), degree_( 0 ) {}
+    size_t getIndex() const { return index_; }
+    const vector< size_t >& getChildren() const { return children_; }
+    void addChild( size_t index ) { children_.push_back( index ); }
+    void increaseDegree() { ++degree_; }
+    size_t getDegree() const { return degree_; }
+    private:
+      size_t index_;
+      size_t degree_;
+      vector< size_t > children_;
+  };
+
+  double getOneTree( vector< Vertex >& nodes, const vector< vector< double > >& distances, const vector< double >& lambda )
   {
     // Compute minimum spanning tree of the vertices excluding the first
     vector< size_t > minimumSpanningTree;
     minimumSpanningTree.reserve( distances.size() );
     minimumSpanningTree.push_back( 1 );
+    nodes.clear();
+    for ( size_t i = 0; i < distances.size(); ++i ) {
+      nodes.push_back( Vertex( i ) );
+    }
+
 
     set< size_t > unusedVertices;
     for ( size_t i = 2; i < distances.size(); ++i ) {
@@ -78,35 +96,75 @@ namespace TravelingSalesmanSolver {
 
     double length = 0.0;
     while ( minimumSpanningTree.size() + 1 < distances.size() ) {
+      size_t fromIndex = 0;
       size_t minIndex = 0;
       double minDistance = numeric_limits< double >::max();
       for ( size_t i = 0; i < minimumSpanningTree.size(); ++i ) {
         size_t mstIndex = minimumSpanningTree[ i ];
         for ( set< size_t >::const_iterator it = unusedVertices.begin(); it != unusedVertices.end(); ++it ) {
-          double distance = distances[ mstIndex ][ *it ];
+          double distance = distances[ mstIndex ][ *it ] + lambda[ mstIndex ] + lambda[ *it ];
           if ( distance < minDistance ) {
             minIndex = *it;
             minDistance = distance;
+            fromIndex = mstIndex;
           }
         }
       }
       minimumSpanningTree.push_back( minIndex );
       unusedVertices.erase( minIndex );
       length += minDistance;
+      nodes[ fromIndex ].addChild( minIndex );
+      nodes[ fromIndex ].increaseDegree();
+      nodes[ minIndex ].increaseDegree();
     }
+
     double minElement = numeric_limits< double >::max();
     double secondMinElement = numeric_limits< double >::max();
+    size_t minIndex = (size_t)-1;
+    size_t secondMinIndex = (size_t)-1;
     for ( size_t i = 0; i < distances.front().size(); ++i ) {
-      double value = distances.front()[ i ];
+      double value = distances.front()[ i ] + lambda[ 0 ] + lambda[ i ];
       if ( value < secondMinElement ) {
         secondMinElement = value;
+        secondMinIndex = i;
         if ( value < minElement ) {
           secondMinElement = minElement;
+          secondMinIndex = minIndex;
           minElement = value;
+          minIndex = i;
         }
       }
     }
+    nodes[ 0 ].addChild( minIndex );
+    nodes[ 0 ].addChild( secondMinIndex );
+    nodes[ 0 ].increaseDegree();
+    nodes[ 0 ].increaseDegree();
+
     length += minElement + secondMinElement;
+    return length - 2.0 * accumulate( lambda.begin(), lambda.end(), 0.0 );
+  }
+
+  double getHeldKarpLowerBound( const vector< vector< double > >& distances )
+  {
+    double length = numeric_limits< double >::min();
+    vector< double > lambda( distances.size() );
+    double delta = 3e-3;
+    for ( size_t i = 0; i < 10; ++i ) {
+      vector< Vertex > nodes;
+      length = getOneTree( nodes, distances, lambda );
+      for ( size_t j = 0; j < lambda.size(); ++j ) {
+        size_t degree = nodes[ j ].getDegree();
+        if ( degree == 1 ) {
+          lambda[ j ] -= delta;
+        }
+        else if ( degree > 2 ) {
+          lambda[ j ] += ( degree - 2 ) * delta;
+        }
+      }
+      cerr << length << endl;
+      delta *= 0.9;
+    }
+
     return length;
   }
 
@@ -119,16 +177,6 @@ namespace TravelingSalesmanSolver {
     distance += distances[ path.back() ][ path.front() ];
     return distance;
   }
-
-  struct Vertex {
-    Vertex( size_t index ) : index_( index ) {}
-    size_t getIndex() const { return index_; }
-    const vector< size_t >& getChildren() const { return children_; }
-    void addChild( size_t index ) { children_.push_back( index ); }
-    private:
-      size_t index_;
-      vector< size_t > children_;
-  };
 
   vector< size_t > computeMinimumSpanningTreePath( const vector< vector< double > >& distances )
   {
@@ -225,16 +273,20 @@ namespace TravelingSalesmanSolver {
     const size_t iMinus1 = i == 0 ? path.size() - 1 : i - 1;
     const size_t pathIminus1 = path[ iMinus1 ];
     const size_t pathJ = path[ j ];
-    const size_t jMinus1 = j == 0 ? path.size() - 1 : j - 1;
+    const size_t jMinus1 = j - 1;
     const size_t pathJminus1 = path[ jMinus1 ];
     const size_t pathK = path[ k ];
-    const size_t kMinus1 = k == 0 ? path.size() - 1 : k - 1;
+    const size_t kMinus1 = k - 1;
     const size_t pathKminus1 = path[ kMinus1 ];
     // subtract a little something to avoid numerical errors
     const double eps = 1e-9;
-    const double removedDistance = distances[ pathIminus1 ][ pathI ] + distances[ pathJminus1 ][ pathJ ] + distances[ pathKminus1 ][ pathK ] - eps;
+    const double removedDistance = distances[ pathIminus1 ][ pathI ] +
+                                   distances[ pathJminus1 ][ pathJ ] +
+                                   distances[ pathKminus1 ][ pathK ] - eps;
 
-    if ( distances[ pathJminus1 ][ pathK ] + distances[ pathIminus1 ][ pathKminus1 ] + distances[ pathJ ][ pathI ] < removedDistance ) {
+    if ( distances[ pathJminus1 ][ pathK ] +
+         distances[ pathIminus1 ][ pathKminus1 ] +
+         distances[ pathJ ][ pathI ] < removedDistance ) {
       vector< size_t > pathCopy( path );
       copy( pathCopy.begin() + i, pathCopy.begin() + j, path.begin() );
       size_t pathIdx = j - i;
@@ -249,7 +301,9 @@ namespace TravelingSalesmanSolver {
       return true;
     }
 
-    if ( distances[ pathJminus1 ][ pathIminus1 ] + distances[ pathK ][ pathJ ] + distances[ pathKminus1 ][ pathI ] < removedDistance ) {
+    if ( distances[ pathJminus1 ][ pathIminus1 ] +
+         distances[ pathK ][ pathJ ] +
+         distances[ pathKminus1 ][ pathI ] < removedDistance ) {
       vector< size_t > pathCopy( path );
       copy( pathCopy.begin() + i, pathCopy.begin() + j, path.begin() );
       size_t pathIdx = j - i;
@@ -263,7 +317,9 @@ namespace TravelingSalesmanSolver {
       return true;
     }
 
-    if ( distances[ pathJminus1 ][ pathKminus1 ] + distances[ pathJ ][ pathIminus1 ] + distances[ pathK ][ pathI ] < removedDistance ) {
+    if ( distances[ pathJminus1 ][ pathKminus1 ] +
+         distances[ pathJ ][ pathIminus1 ] +
+         distances[ pathK ][ pathI ] < removedDistance ) {
       vector< size_t > pathCopy( path );
       copy( pathCopy.begin() + i, pathCopy.begin() + j, path.begin() );
       size_t pathIdx = j - i;
@@ -382,26 +438,30 @@ namespace TravelingSalesmanSolver {
   /*
   void computeLinKernighanPath( vector< size_t >& path, const vector< vector< double > >& distances )
   {
-    vector< size_t > t;
     bool changed = true;
+    vector< pair< size_t, size_t > > x;
+    vector< pair< size_t, size_t > > y;
     while ( changed ) {
       changed = false;
-      for ( size_t i = 0; i < path.size(); ++i ) {
-        t.clear();
-        t.push_back( path[ i == 0 ? path.size() - 1 : i - 1 ] );
-        t.push_back( path[ i ] );
-        size_t ind = 1;
+      for ( size_t i = 0; i < path.size(); ++i ) { // Step 2
+        x.clear();
+        y.clear();
+        x.push_back( make_pair( path[ i == 0 ? path.size() - 1 : i - 1 ], path[ i ] ) ); // Step 3
+        size_t ind = 0;
+        double G = 0.0;
         for ( size_t j = i + 2; j < path.size(); ++j ) {
           if ( i < 2 && j + 1 == path.size() ) {
             continue;
           }
-          if ( distances[ t[ 0 ] ][ t[ 1 ] ] < distances[ t[ 1 ] ][ path[ j ] ] ) {
+          double gain = distances[ x[ ind ].first ][ x[ ind ].second ] - distances[ x[ ind ].second ][ path[ j ] ];
+          if ( gain < 0.0 ) {
             continue;
           }
-          t.push_back( path[ j ] );
-          ++ind;
+          G = gain;
+          y.push_back( make_pair( x[ ind ].second, path[ j ] ) ); // Step 4
+          ++ind; // Step 5
 
-          t.push_back( path[ j == 0 ? path.size() - 1 : j - 1 ] );
+          x.push_back( make_pair( y[ ind - 1 ].second, path[ j - 1 ] ) )
           const double deltaDistance =
             distances[ t[ 1 ] ][ t[ 2 ] ] + distances[ t[ 3 ] ][ t[ 1 ] ] -
             distances[ t[ 0 ] ][ t[ 1 ] ] - distances[ t[ 2 ] ][ t[ 3 ] ];
@@ -414,6 +474,8 @@ namespace TravelingSalesmanSolver {
           for ( size_t k = 0; k < path.size(); ++k ) {
 
           }
+        }
+        if ( !changed ) { // Step 12
         }
 
           const size_t pathI = path[ i ];
@@ -433,7 +495,7 @@ namespace TravelingSalesmanSolver {
       }
     }
   }
-*/
+  */
 
   vector< size_t > computePath( const vector< vector< double > >& distances )
   {
@@ -463,9 +525,9 @@ namespace TravelingSalesmanSolver {
     if ( true ) {
       cerr << "1-tree distance: ";
       double start( clock() );
-      double oneTreeL = oneTreeLength( distances );
+      double lowerBound = getHeldKarpLowerBound( distances );
       double time( ( clock() - start ) / CLOCKS_PER_SEC );
-      cerr << oneTreeL << ", time: " << setprecision( 4 ) << time << endl;
+      cerr << lowerBound << ", time: " << setprecision( 4 ) << time << endl;
     }
 
     if ( false ) {
