@@ -378,6 +378,19 @@ restart3opt:
     }
   }
 
+  void make2OptMove_( size_t t0, size_t t1, size_t t2, size_t t3, vector< size_t >& path )
+  {
+    cerr << t0 << " " << t1 << " " << t2 << " " << t3 << endl;
+    assert( fabs( fabs( float( t0 ) - float( t1 ) ) - 1.0 ) < 1e-6 );
+    assert( fabs( fabs( float( t2 ) - float( t3 ) ) - 1.0 ) < 1e-6 );
+    size_t ind1 = max( t0, t1 );
+    size_t ind2 = max( t2, t3 );
+    if ( ind1 > ind2 ) {
+      swap( ind1, ind2 );
+    }
+    reverse( path.begin() + ind1, path.begin() + ind2 + 1 );
+  }
+
   bool update2Opt_( size_t i,
                     size_t j,
                     vector< size_t >& path,
@@ -439,7 +452,6 @@ restart3opt:
     }
   }
 
-  /*
   void computeLinKernighanPath_( vector< size_t >& path,
                                  const vector< vector< double > >& distances )
   {
@@ -447,6 +459,7 @@ restart3opt:
     vector< pair< size_t, size_t > > x;
     vector< pair< size_t, size_t > > y;
     vector< size_t > t;
+    const double eps = 1e-9;
     while ( changed ) {
       changed = false;
 restartLinKernighan:
@@ -462,58 +475,81 @@ restartLinKernighan:
         t.clear();
         t.push_back( path[ i == 0 ? path.size() - 1 : i - 1 ] );
         t.push_back( path[ i ] );
-        x.push_back( make_pair( t[ 0 ], t[ 1 ] ) ); // Step 3. Choose x_1 = ( t_1, t_2 ) in T
+        // Step 3. Choose x_0 = ( t_0, t_1 ) in T
+        x.push_back( make_pair( t[ 0 ], t[ 1 ] ) );
         for ( size_t j = i + 2; j < path.size(); ++j ) {
+          // Step 4. Choose y_0 = ( t_1, t_2 ) not in T such that G > 0
           if ( i < 2 && j + 1 == path.size() ) {
             continue;
           }
-          // Step 4. Choose y_0 = ( t_1, t_2 ) not in T such that G > 0
           if ( T.find( make_pair( t[ 1 ], path[ j ] ) ) != T.end() ) {
             // y is in T
             continue;
           }
-          double G = distances[ t[ 0 ] ][ t[ 1 ] ] - distances[ t[ 1 ] ][ path[ j ] ];
-          if ( G <= 0.0 ) {
+          double G0 = distances[ t[ 0 ] ][ t[ 1 ] ] - distances[ t[ 1 ] ][ path[ j ] ];
+          if ( G0 <= eps ) {
             continue;
           }
-
-          //if ( ( ( find( path.begin(), path.end(), path[ j ] ) - path.begin() ) + path.size() - 1 ) % path.size()  
+          double G = G0;
 
           // Found y not in T with positive gain
           t.push_back( path[ j ] );
-          y.push_back( make_pair( t[ 1 ], t[ 2 ] ) );
+          y.push_back( make_pair( t[ 1 ], t[ 2 ] ) ); // y_0
 
+          size_t maxKForIndEquals2 = 0;
           bool nextYExists = true;
           bool nextXExists = true;
           while ( nextYExists ) {
             // Step 5. Let ind = ind + 1
             ++ind;
-            nextYExists = false;
-
             // Step 6. Choose x_i = (t_(2i), t_(2i+1)) in T such that
             // (a) if t_(2i+1) is joined to t_0, the resulting configuration is a tour T'
             // (b) x_i != y_s for all s < i
-            {
-              size_t tNext = path[ ( ( find( path.begin(), path.end(), t.back() ) - path.begin() ) + path.size() - 1 ) % path.size() ]; // element in path previous to t_(2i)
-              assert( nextXExists ); // condition (b): x_i != y_s for all s < i
-              x.push_back( make_pair( t.back(), tNext ) ); // Add x_i = (t_(2i), t_(2i+1))
-              t.push_back( tNext ); // Add t_(2i+1)
-              if ( G + distances[ t.back() ][ tNext ] < 0.0 ) {
-                y.push_back( make_pair( tNext, t.front() ) );
-                changed = true;
-                // Take tour
-                vector< size_t > pathCopy( path );
-                
-                goto restartLinKernighan;
+            size_t tNext = path[ ( ( find( path.begin(), path.end(), t.back() ) - path.begin() ) + path.size() - 1 ) % path.size() ]; // element in path previous to t_(2i)
+            assert( nextXExists ); // condition (b): x_i != y_s for all s < i
+            x.push_back( make_pair( t.back(), tNext ) ); // Add x_i = (t_(2i), t_(2i+1))
+            t.push_back( tNext ); // Add t_(2i+1)
+
+            cerr << ind << ". x size: " << x.size() << ", G: " << G << ", return: " << G + distances[ x.back().first ][ x.back().second ] - distances[ t.back() ][ t.front() ] << endl;
+            if ( G + distances[ x.back().first ][ x.back().second ] - distances[ t.back() ][ t.front() ] > eps ) {
+              y.push_back( make_pair( t.back(), t.front() ) );
+              changed = true;
+              // Take tour
+              vector< size_t > pathCopy( path );
+              assert( t.size() % 2 == 0 );
+              assert( x.size() == y.size() );
+              size_t t1 = find( path.begin(), path.end(), x[ 0 ].second ) - path.begin();
+              cerr << "Take tour" << endl;
+              cerr << "x.size() " << x.size() << endl;
+              cerr << "G: " << G << " dist: " << distances[ t.back() ][ t.front() ] << endl;
+              for ( size_t k = 1; k < x.size(); ++k ) {
+                size_t t0 = find( path.begin(), path.end(), x[ 0 ].first ) - path.begin();
+                size_t t2 = find( path.begin(), path.end(), x[ k ].first ) - path.begin();
+                size_t t3 = find( path.begin(), path.end(), x[ k ].second ) - path.begin();
+                make2OptMove_( t0, t1, t2, t3, path );
+                t1 = find( path.begin(), path.end(), x[ k ].second ) - path.begin();
               }
+              assert( path != pathCopy );
+
+              if ( getLength_( path, distances ) >= getLength_( pathCopy, distances ) ) {
+                cerr << setprecision( 28 ) << getLength_( path, distances ) << " " << getLength_( pathCopy, distances ) << endl;
+              }
+              assert( getLength_( path, distances ) < getLength_( pathCopy, distances ) );
+              goto restartLinKernighan;
             }
 
+step7:
+            nextYExists = false;
             // Step 7. Select y_i = (t_(2i+1), t_(2i+2)) not in T such that
             // (a) G_i > 0
             // (b) y_i != x_s for all s <= i
             // (c) x_(i+1) exists
             // If such y_i exists, go to step 5
-            for ( size_t k = 0; k < path.size(); ++k ) {
+            size_t startK = y.size() == 1 ? maxKForIndEquals2 : 0;
+            for ( size_t k = startK; k < path.size(); ++k ) {
+              if ( y.size() == 1 ) {
+                ++maxKForIndEquals2;
+              }
               if ( k == i || k == j ) {
                 continue;
               }
@@ -524,7 +560,7 @@ restartLinKernighan:
               }
               // (a) G_i > 0
               double gain = distances[ x.back().first ][ x.back().second ] - distances[ t.back() ][ path[ k ] ];
-              if ( gain <= 0.0 ) {
+              if ( G + gain <= eps ) {
                 continue;
               }
               // (b) y_i != x_s for all s <= i
@@ -540,6 +576,7 @@ restartLinKernighan:
               if ( !nextXExists ) {
                 continue;
               }
+              G += gain;
               y.push_back( yCandidate );
               t.push_back( path[ k ] );
 
@@ -547,12 +584,27 @@ restartLinKernighan:
               nextYExists = true;
               break;
             }
+
+            if ( !nextYExists && maxKForIndEquals2 < path.size() ) {
+              // Step 8. If there is an untried alternative for y_1, let i = 1 and go to Step 7
+              while ( y.size() > 1 ) {
+                y.pop_back();
+              }
+              while ( x.size() > 2 ) {
+                x.pop_back();
+              }
+              while ( t.size() > 4 ) {
+                t.pop_back();
+              }
+              ind = 1;
+              G = G0;
+              goto step7;
+            }
           }
         }
       }
     }
   }
-  */
 } // anonymous namespace
 
 namespace TravelingSalesmanSolver {
@@ -586,11 +638,19 @@ namespace TravelingSalesmanSolver {
       assertIsPath_( path, distances );
     }
 
-    if ( true ) {
+    if ( false ) {
       double start( clock() );
       compute3OptPath_( path, distances, nearestNeighbors );
       double time( ( clock() - start ) / CLOCKS_PER_SEC );
       cerr << "3-opt path distance: " << getLength_( path, distances ) << ", time: " << setprecision( 4 ) << time << endl;
+      assertIsPath_( path, distances );
+    }
+
+    if ( true ) {
+      double start( clock() );
+      computeLinKernighanPath_( path, distances );
+      double time( ( clock() - start ) / CLOCKS_PER_SEC );
+      cerr << "LK-opt path distance: " << getLength_( path, distances ) << ", time: " << setprecision( 4 ) << time << endl;
       assertIsPath_( path, distances );
     }
 
