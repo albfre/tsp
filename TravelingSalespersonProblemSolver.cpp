@@ -11,7 +11,7 @@
 #include <set>
 
 /* HEADER */
-#include "TravelingSalesmanSolver.h"
+#include "TravelingSalespersonProblemSolver.h"
 
 using namespace std;
 
@@ -607,7 +607,7 @@ step7:
   }
 } // anonymous namespace
 
-namespace TravelingSalesmanSolver {
+namespace TravelingSalespersonProblemSolver {
   vector< size_t > computePath( const vector< vector< double > >& distances )
   {
     assert( distances.size() > 0 );
@@ -632,7 +632,7 @@ namespace TravelingSalesmanSolver {
 
     if ( true ) {
       double start( clock() );
-      compute2OptPathRandom_( path, distances );
+      compute2OptPath_( path, distances );
       double time( ( clock() - start ) / CLOCKS_PER_SEC );
       cerr << "2-opt path distance: " << getLength_( path, distances ) << ", time: " << setprecision( 4 ) << time << endl;
       assertIsPath_( path, distances );
@@ -657,6 +657,7 @@ namespace TravelingSalesmanSolver {
     if ( false ) {
       compute2OptPathRandom_( path, distances );
       compute3OptPathRandom_( path, distances );
+      compute3OptPath_( path, distances );
     }
 
     return path;

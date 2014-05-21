@@ -1,10 +1,10 @@
-#ifndef TRAVELING_SALESMAN_H
-#define TRAVELING_SALESMAN_H
+#ifndef TRAVELING_SALESPERSON_H
+#define TRAVELING_SALESPERSON_H
 
 #include <cstddef>
 #include <vector>
 
-namespace TravelingSalesmanSolver {
+namespace TravelingSalespersonProblemSolver {
   std::vector< size_t > computePath( const std::vector< std::vector< double > >& distances );
 }
 

@@ -11,10 +11,10 @@
 #include <fstream>
 #include <vector>
 
-#include "TravelingSalesmanSolver.h"
+#include "TravelingSalespersonProblemSolver.h"
 
 using namespace std;
-using namespace TravelingSalesmanSolver;
+using namespace TravelingSalespersonProblemSolver;
 
 double computeDistance( const vector< double >& point1, const vector< double >& point2 )
 {

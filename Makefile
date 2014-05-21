@@ -1,6 +1,6 @@
 CC = g++
 CFLAGS = -g -funroll-loops -std=gnu++0x -O2 -Wall -pedantic
-FILE = TravelingSalesmanSolver
+FILE = TravelingSalespersonProblemSolver
 SRCS = $(FILE).cpp $(FILE).h
 OBJS = $(FILE).o
 TEST = TestTSP
