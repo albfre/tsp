@@ -77,7 +77,7 @@ namespace {
   vector< vector< size_t > > computeNearestNeighbors_( const vector< vector< double > >& distances,
                                                        size_t numberOfNeighbors )
   {
-    assert( numberOfNeighbors < distances.size() );
+    numberOfNeighbors = min( numberOfNeighbors, distances.size() - 1 );
     vector< vector< size_t > > nearestNeighbors( distances.size(), vector< size_t >( numberOfNeighbors ) );
     vector< pair< double, size_t > > tmpNeighbors( distances.size() );
     for ( size_t i = 0; i < distances.size(); ++i ) {
@@ -85,8 +85,8 @@ namespace {
         tmpNeighbors[ j ] = make_pair( distances[ i ][ j ], j );
       }
       sort( tmpNeighbors.begin(), tmpNeighbors.end() );
-      // Start from 1 to avoid adding self as neighbor
       for ( size_t j = 0; j < numberOfNeighbors; ++j ) {
+        // Take neighbor j + 1 in order to avoid adding self as neighbor
         nearestNeighbors[ i ][ j ] = tmpNeighbors[ j + 1 ].second;
       }
     }
@@ -113,7 +113,7 @@ namespace {
                     const vector< vector< double > >& distances,
                     const vector< double >& lagrangeMultipliers )
   {
-    // Compute minimum spanning tree of the vertices excluding the first
+    // 1. Compute minimum spanning tree of the vertices excluding the first
     nodes.clear();
     for ( size_t i = 0; i < distances.size(); ++i ) {
       nodes.push_back( Vertex( i ) );
@@ -123,6 +123,7 @@ namespace {
     minimumSpanningTree.reserve( distances.size() );
     minimumSpanningTree.push_back( 1 );
     vector< size_t > unusedVertices;
+    unusedVertices.reserve( distances.size() );
     for ( size_t i = 2; i < distances.size(); ++i ) {
       unusedVertices.push_back( i );
     }
@@ -148,9 +149,11 @@ namespace {
       nodes[ fromIndex ].addChild( *minIt );
       nodes[ fromIndex ].increaseDegree();
       nodes[ *minIt ].increaseDegree();
-      unusedVertices.erase( minIt );
+      *minIt = unusedVertices.back();
+      unusedVertices.pop_back();
     }
 
+    // 2. Add the two shortest edges connecting to the first vertex
     double minElement = numeric_limits< double >::max();
     double secondMinElement = numeric_limits< double >::max();
     size_t minIndex = (size_t)-1;
@@ -198,11 +201,10 @@ namespace {
   double getLength_( vector< size_t > path,
                      const vector< vector< double > >& distances )
   {
-    double distance = 0.0;
+    double distance = distances[ path.back() ][ path.front() ];
     for ( size_t i = 0; i + 1 < path.size(); ++i ) {
       distance += distances[ path[ i ] ][ path[ i + 1 ] ];
     }
-    distance += distances[ path.back() ][ path.front() ];
     return distance;
   }
 
@@ -215,8 +217,7 @@ namespace {
     vector< size_t > pathCopy( path );
     size_t pathIdx = 0;
     for ( size_t i = 0; i < 3; ++i ) {
-      size_t iBegin;
-      size_t iEnd;
+      size_t iBegin, iEnd;
       bool reverse;
       switch ( i ) {
         case 0: iBegin = i1Begin; iEnd = i1End; reverse = reverseI1; break;
@@ -254,19 +255,19 @@ namespace {
                     vector< size_t >& path,
                     const vector< vector< double > >& distances )
   {
-    vector< size_t > nums( 3 );
-    nums[ 0 ] = i; nums[ 1 ] = j; nums[ 2 ] = k;
-    sort( nums.begin(), nums.end() );
-    i = nums[ 0 ]; j = nums[ 1 ]; k = nums[ 2 ];
+    vector< size_t > vertices( 3 );
+    vertices[ 0 ] = i; vertices[ 1 ] = j; vertices[ 2 ] = k;
+    sort( vertices.begin(), vertices.end() );
+    i = vertices[ 0 ]; j = vertices[ 1 ]; k = vertices[ 2 ];
     assert( i < j && j < k );
     const size_t pathI = path[ i ];
-    const size_t iMinus1 = i == 0 ? path.size() - 1 : i - 1;
+    const size_t iMinus1 = ( i + path.size() - 1 ) % path.size();
     const size_t pathIminus1 = path[ iMinus1 ];
     const size_t pathJ = path[ j ];
-    const size_t jMinus1 = j == 0 ? path.size() - 1 : j - 1;
+    const size_t jMinus1 = ( j + path.size() - 1 ) % path.size();
     const size_t pathJminus1 = path[ jMinus1 ];
     const size_t pathK = path[ k ];
-    const size_t kMinus1 = k == 0 ? path.size() - 1 : k - 1;
+    const size_t kMinus1 = ( k + path.size() - 1 ) % path.size();
     const size_t pathKminus1 = path[ kMinus1 ];
     const double eps = 1e-9;
     const double removedDistance = distances[ pathIminus1 ][ pathI ] +
@@ -277,9 +278,9 @@ namespace {
     for ( size_t idx = 0; idx < 3; ++idx ) {
       double newDistance = numeric_limits< double >::max();
       switch ( idx ) {
-        case 0: newDistance = distances[ pathJminus1 ][ pathK ] + distances[ pathIminus1 ][ pathKminus1 ] + distances[ pathJ ][ pathI ]; break;
-        case 1: newDistance = distances[ pathJminus1 ][ pathIminus1 ] + distances[ pathK ][ pathJ ] + distances[ pathKminus1 ][ pathI ]; break;
-        case 2: newDistance = distances[ pathJminus1 ][ pathKminus1 ] + distances[ pathJ ][ pathIminus1 ] + distances[ pathK ][ pathI ]; break;
+        case 0: newDistance = distances[ pathI ][ pathJ ] + distances[ pathK ][ pathJminus1 ] + distances[ pathIminus1 ][ pathKminus1 ]; break;
+        case 1: newDistance = distances[ pathJ ][ pathK ] + distances[ pathI ][ pathKminus1 ] + distances[ pathJminus1 ][ pathIminus1 ]; break;
+        case 2: newDistance = distances[ pathK ][ pathI ] + distances[ pathJ ][ pathIminus1 ] + distances[ pathKminus1 ][ pathJminus1 ]; break;
         default: assert( false );
       }
       if ( newDistance < removedDistance && newDistance < bestDistance ) {
@@ -288,9 +289,9 @@ namespace {
       }
     }
     switch( bestIndex ) {
-      case 0: update3OptIntervals_( path, i, j, false, k, i, false, k - 1, j - 1, true, distances ); return true;
-      case 1: update3OptIntervals_( path, i, j, false, i + path.size() - 1, k - 1, true, j, k, false, distances ); return true;
-      case 2: update3OptIntervals_( path, i, j, false, k - 1, j - 1, true, i + path.size() - 1, k - 1, true, distances ); return true;
+      case 0: update3OptIntervals_( path, i, j, false, k, i, false, kMinus1, jMinus1, true, distances ); return true;
+      case 1: update3OptIntervals_( path, i, j, false, iMinus1, kMinus1, true, j, k, false, distances ); return true;
+      case 2: update3OptIntervals_( path, i, j, false, kMinus1, jMinus1, true, iMinus1, kMinus1, true, distances ); return true;
       default: return false;
     }
   }
@@ -388,7 +389,7 @@ restart3opt:
   {
     bool changed = true;
     size_t outerIter = 0;
-    while ( changed && outerIter < 100 ) {
+    while ( changed && outerIter < 1000 ) {
       changed = false;
       ++outerIter;
       vector< size_t > randNums( 2 );
@@ -430,55 +431,107 @@ restart3opt:
     bool changed = true;
     vector< pair< size_t, size_t > > x;
     vector< pair< size_t, size_t > > y;
+    vector< size_t > t;
     while ( changed ) {
       changed = false;
-      for ( size_t i = 0; i < path.size(); ++i ) { // Step 2
+restartLinKernighan:
+      // Step 2. Let ind = 0. Choose t_0
+      for ( size_t i = 0; i < path.size(); ++i ) {
+        set< pair< size_t, size_t > > T;
+        for ( size_t j = 0; j < path.size(); ++j ) {
+          T.insert( make_pair( path[ j ], path[ j + 1 % path.size() ] ) );
+        }
+        size_t ind = 0;
         x.clear();
         y.clear();
-        x.push_back( make_pair( path[ i == 0 ? path.size() - 1 : i - 1 ], path[ i ] ) ); // Step 3
-        size_t ind = 0;
-        double G = 0.0;
+        t.clear();
+        t.push_back( path[ i == 0 ? path.size() - 1 : i - 1 ] );
+        t.push_back( path[ i ] );
+        x.push_back( make_pair( t[ 0 ], t[ 1 ] ) ); // Step 3. Choose x_1 = ( t_1, t_2 ) in T
         for ( size_t j = i + 2; j < path.size(); ++j ) {
           if ( i < 2 && j + 1 == path.size() ) {
             continue;
           }
-          double gain = distances[ x[ ind ].first ][ x[ ind ].second ] - distances[ x[ ind ].second ][ path[ j ] ];
-          if ( gain < 0.0 ) {
+          // Step 4. Choose y_0 = ( t_1, t_2 ) not in T such that G > 0
+          if ( T.find( make_pair( t[ 1 ], path[ j ] ) ) != T.end() ) {
+            // y is in T
             continue;
           }
-          G = gain;
-          y.push_back( make_pair( x[ ind ].second, path[ j ] ) ); // Step 4
-          ++ind; // Step 5
-
-          x.push_back( make_pair( y[ ind - 1 ].second, path[ j - 1 ] ) )
-          const double deltaDistance =
-            distances[ t[ 1 ] ][ t[ 2 ] ] + distances[ t[ 3 ] ][ t[ 1 ] ] -
-            distances[ t[ 0 ] ][ t[ 1 ] ] - distances[ t[ 2 ] ][ t[ 3 ] ];
-          if ( deltaDistance < 0.0 ) {
-            reverse( path.begin() + i, path.begin() + j + 1 );
-            changed = true;
-            break;
+          double G = distances[ t[ 0 ] ][ t[ 1 ] ] - distances[ t[ 1 ] ][ path[ j ] ];
+          if ( G <= 0.0 ) {
+            continue;
           }
 
-          for ( size_t k = 0; k < path.size(); ++k ) {
+          //if ( ( ( find( path.begin(), path.end(), path[ j ] ) - path.begin() ) + path.size() - 1 ) % path.size()  
 
-          }
-        }
-        if ( !changed ) { // Step 12
-        }
+          // Found y not in T with positive gain
+          t.push_back( path[ j ] );
+          y.push_back( make_pair( t[ 1 ], t[ 2 ] ) );
 
-          const size_t pathI = path[ i ];
-          const size_t pathJ = path[ j ];
-          const size_t pathJplus1 = path[ j + 1 == path.size() ? 0 : j + 1 ];
-          const size_t pathIminus1 = path[ i == 0 ? path.size() - 1 : i - 1 ];
-          const double deltaDistance =
-            distances[ pathIminus1 ][ pathJ ] + distances[ pathI ][ pathJplus1 ] -
-            distances[ pathIminus1 ][ pathI ] - distances[ pathJ ][ pathJplus1 ];
-          if ( deltaDistance < 0.0 ) {
-            reverse( path.begin() + i, path.begin() + j + 1 );
-            changed = true;
-            break;
+          bool nextYExists = true;
+          bool nextXExists = true;
+          while ( nextYExists ) {
+            // Step 5. Let ind = ind + 1
+            ++ind;
+            nextYExists = false;
 
+            // Step 6. Choose x_i = (t_(2i), t_(2i+1)) in T such that
+            // (a) if t_(2i+1) is joined to t_0, the resulting configuration is a tour T'
+            // (b) x_i != y_s for all s < i
+            {
+              size_t tNext = path[ ( ( find( path.begin(), path.end(), t.back() ) - path.begin() ) + path.size() - 1 ) % path.size() ]; // element in path previous to t_(2i)
+              assert( nextXExists ); // condition (b): x_i != y_s for all s < i
+              x.push_back( make_pair( t.back(), tNext ) ); // Add x_i = (t_(2i), t_(2i+1))
+              t.push_back( tNext ); // Add t_(2i+1)
+              if ( G + distances[ t.back() ][ tNext ] < 0.0 ) {
+                y.push_back( make_pair( tNext, t.front() ) );
+                changed = true;
+                // Take tour
+                vector< size_t > pathCopy( path );
+                
+                goto restartLinKernighan;
+              }
+            }
+
+            // Step 7. Select y_i = (t_(2i+1), t_(2i+2)) not in T such that
+            // (a) G_i > 0
+            // (b) y_i != x_s for all s <= i
+            // (c) x_(i+1) exists
+            // If such y_i exists, go to step 5
+            for ( size_t k = 0; k < path.size(); ++k ) {
+              if ( k == i || k == j ) {
+                continue;
+              }
+              pair< size_t, size_t > yCandidate( t.back(), path[ k ] );
+              // y is not in T
+              if ( T.find( yCandidate ) != T.end() ) {
+                continue;
+              }
+              // (a) G_i > 0
+              double gain = distances[ x.back().first ][ x.back().second ] - distances[ t.back() ][ path[ k ] ];
+              if ( gain <= 0.0 ) {
+                continue;
+              }
+              // (b) y_i != x_s for all s <= i
+              if ( find( x.begin(), x.end(), yCandidate ) == x.end() ) {
+                continue;
+              }
+              // (c) x_(i+1) exists
+              size_t tNextCandidate = path[ ( ( find( path.begin(), path.end(), path[ k ] ) - path.begin() ) + path.size() - 1 ) % path.size() ]; // element in path previous to t_(2i+2) candidate
+              pair< size_t, size_t > xCandidate( path[ k ], tNextCandidate );
+              nextXExists = find( x.begin(), x.end(), xCandidate ) == x.end() &&
+                            find( y.begin(), y.end(), xCandidate ) == y.end() &&
+                            tNextCandidate != t.back();
+              if ( !nextXExists ) {
+                continue;
+              }
+              y.push_back( yCandidate );
+              t.push_back( path[ k ] );
+
+              // Found y, goto step 5
+              nextYExists = true;
+              break;
+            }
           }
         }
       }
@@ -512,7 +565,7 @@ namespace TravelingSalesmanSolver {
 
     if ( true ) {
       double start( clock() );
-      compute2OptPath_( path, distances );
+      compute2OptPathRandom_( path, distances );
       double time( ( clock() - start ) / CLOCKS_PER_SEC );
       cerr << "2-opt path distance: " << getLength_( path, distances ) << ", time: " << setprecision( 4 ) << time << endl;
       assertIsPath_( path, distances );
