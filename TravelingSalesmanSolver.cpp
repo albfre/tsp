@@ -113,7 +113,7 @@ namespace {
                     const vector< vector< double > >& distances,
                     const vector< double >& lagrangeMultipliers )
   {
-    // 1. Compute minimum spanning tree of the vertices excluding the first
+    // 1. Compute minimum spanning tree of the vertices excluding the first, using Prim's algorithm
     nodes.clear();
     for ( size_t i = 0; i < distances.size(); ++i ) {
       nodes.push_back( Vertex( i ) );
@@ -128,29 +128,44 @@ namespace {
       unusedVertices.push_back( i );
     }
 
+    // For each unused vertex i, closestTreeNode[ i ] points to the vertex in the tree which is closest to i
+    vector< size_t > closestTreeNode;
+    closestTreeNode.reserve( distances.size() );
+    for ( size_t i = 0; i < distances.size(); ++i ) {
+      closestTreeNode.push_back( 1 );
+    }
+
     double length = 0.0;
     while ( minimumSpanningTree.size() + 1 < distances.size() ) {
       size_t fromIndex = 0;
       vector< size_t >::iterator minIt = unusedVertices.begin();
       double minDistance = numeric_limits< double >::max();
-      for ( size_t i = 0; i < minimumSpanningTree.size(); ++i ) {
-        size_t mstIndex = minimumSpanningTree[ i ];
-        for ( vector< size_t >::iterator it = unusedVertices.begin(); it != unusedVertices.end(); ++it ) {
-          double distance = distances[ mstIndex ][ *it ] + lagrangeMultipliers[ mstIndex ] + lagrangeMultipliers[ *it ];
-          if ( distance < minDistance ) {
-            minDistance = distance;
-            fromIndex = mstIndex;
-            minIt = it;
-          }
+      for ( vector< size_t >::iterator it = unusedVertices.begin(); it != unusedVertices.end(); ++it ) {
+        size_t mstIndex = closestTreeNode[ *it ];
+        double distance = distances[ mstIndex ][ *it ] + lagrangeMultipliers[ mstIndex ] + lagrangeMultipliers[ *it ];
+        if ( distance < minDistance ) {
+          minDistance = distance;
+          fromIndex = mstIndex;
+          minIt = it;
         }
       }
-      minimumSpanningTree.push_back( *minIt );
+      size_t indexOfNewTreeNode = *minIt;
+      minimumSpanningTree.push_back( indexOfNewTreeNode );
       length += minDistance;
-      nodes[ fromIndex ].addChild( *minIt );
+      nodes[ fromIndex ].addChild( indexOfNewTreeNode );
       nodes[ fromIndex ].increaseDegree();
-      nodes[ *minIt ].increaseDegree();
+      nodes[ indexOfNewTreeNode ].increaseDegree();
       *minIt = unusedVertices.back();
       unusedVertices.pop_back();
+
+      for ( vector< size_t >::iterator it = unusedVertices.begin(); it != unusedVertices.end(); ++it ) {
+        size_t mstIndex = closestTreeNode[ *it ];
+        double oldDistance = distances[ mstIndex ][ *it ] + lagrangeMultipliers[ mstIndex ] + lagrangeMultipliers[ *it ];
+        double newDistance = distances[ indexOfNewTreeNode ][ *it ] + lagrangeMultipliers[ indexOfNewTreeNode ] + lagrangeMultipliers[ *it ];
+        if ( newDistance < oldDistance ) {
+          closestTreeNode[ *it ] = indexOfNewTreeNode;
+        }
+      }
     }
 
     // 2. Add the two shortest edges connecting to the first vertex
@@ -185,14 +200,14 @@ namespace {
     double length = numeric_limits< double >::min();
     vector< double > lagrangeMultipliers( distances.size() );
     double delta = 3e-3;
-    for ( size_t i = 0; i < 10; ++i ) {
+    for ( size_t i = 0; i < 50; ++i ) {
       vector< Vertex > nodes;
       length = get1Tree_( nodes, distances, lagrangeMultipliers );
       bestLength = max( bestLength, length );
       for ( size_t j = 0; j < lagrangeMultipliers.size(); ++j ) {
         lagrangeMultipliers[ j ] += ( int( nodes[ j ].getDegree() ) - 2 ) * delta;
       }
-      delta *= 0.95;
+      delta *= 0.98;
     }
 
     return bestLength;
