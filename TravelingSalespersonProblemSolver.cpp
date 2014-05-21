@@ -45,6 +45,37 @@ namespace {
     return path;
   }
 
+  void reverse( vector< size_t >& path, const size_t i, const size_t j )
+  {
+    if ( j - i < path.size() - j + i ) {
+      reverse( path.begin() + i, path.begin() + j );
+    }
+    else {
+      size_t nnn = 0;
+      vector< size_t >::iterator iIt = path.begin() + i + 1;
+      vector< size_t >::iterator jIt = path.begin() + j;
+      for ( ; iIt != path.begin() && jIt != path.end(); ++jIt ) {
+        --iIt;
+        swap( *iIt, *jIt );
+        ++nnn;
+      }
+      if ( jIt == path.end() ) {
+        jIt = path.begin();
+      }
+      else if ( iIt == path.begin() ) {
+        iIt = path.end() - 1;
+      }
+      for ( ; iIt > jIt; --iIt, ++jIt ) {
+        swap( *iIt, *jIt );
+        ++nnn;
+      }
+      if ( fabs( int(nnn) - int( path.size() - j + i ) / 2 ) > 2 ) {
+        cerr << "n: " << nnn << " path.size() " << path.size() << " i: " << i << ", j: " << j << ", " <<  int( path.size() - j + i ) / 2  << endl;
+        assert( false );
+      }
+    }
+  }
+
   vector< size_t > getNearestNeighborPath_( const vector< vector< double > >& distances )
   {
     vector< size_t > path;
@@ -73,6 +104,30 @@ namespace {
     assertIsPath_( path, distances );
     return path;
   }
+
+/*
+  vector< size_t > getGreedyPath_( const vector< vector< double > >& distances )
+  {
+    vector< size_t > path;
+    path.reserve( distances.size() );
+    vector< pair< double, pair< size_t, size_t > > > edges;
+    edges.reserve( distances.size() * ( distances.size() - 1 ) / 2 );
+    for ( size_t i = 0; i < distances.size(); ++i ) {
+      for ( size_t j = i + 1; j < distances[ i ].size(); ++j ) {
+        edges.push_back( make_pair( distances[ i ][ j ], make_pair( i, j ) ) );
+      }
+    }
+    vector< pair< size_t, size_t > > addedEdges;
+    sort( edges.rbegin(), edges.rend() ); // rbegin-rend => sort ascending
+    while ( path.size() < distances.size() ) {
+      pair< size_t, size_t > nodes
+
+    }
+
+    assertIsPath_( path, distances );
+    return path;
+  }
+  */
 
   vector< vector< size_t > > computeNearestNeighbors_( const vector< vector< double > >& distances,
                                                        size_t numberOfNeighbors )
@@ -199,15 +254,22 @@ namespace {
     double bestLength = numeric_limits< double >::min();
     double length = numeric_limits< double >::min();
     vector< double > lagrangeMultipliers( distances.size() );
-    double delta = 3e-3;
+    double lambda = 0.1;
     for ( size_t i = 0; i < 50; ++i ) {
       vector< Vertex > nodes;
       length = get1Tree_( nodes, distances, lagrangeMultipliers );
       bestLength = max( bestLength, length );
+      double denominator = 0.0;
       for ( size_t j = 0; j < lagrangeMultipliers.size(); ++j ) {
-        lagrangeMultipliers[ j ] += ( int( nodes[ j ].getDegree() ) - 2 ) * delta;
+        double d = double( nodes[ j ].getDegree() ) - 2.0;
+        denominator += d * d;
       }
-      delta *= 0.98;
+      double t = 2.0 * lambda * length / denominator;
+
+      for ( size_t j = 0; j < lagrangeMultipliers.size(); ++j ) {
+        lagrangeMultipliers[ j ] += t * ( int( nodes[ j ].getDegree() ) - 2 );
+      }
+      lambda = 1.0 / ( 20.0 + 10 * i );
     }
 
     return bestLength;
@@ -288,51 +350,21 @@ namespace {
     const double removedDistance = distances[ pathIminus1 ][ pathI ] +
                                    distances[ pathJminus1 ][ pathJ ] +
                                    distances[ pathKminus1 ][ pathK ] - eps; // subtract a little something to avoid numerical errors
-    size_t bestIndex = (size_t)-1;
-    double bestDistance = numeric_limits< double >::max();
-    for ( size_t idx = 0; idx < 3; ++idx ) {
-      double newDistance = numeric_limits< double >::max();
-      switch ( idx ) {
-        case 0: newDistance = distances[ pathI ][ pathJ ] + distances[ pathK ][ pathJminus1 ] + distances[ pathIminus1 ][ pathKminus1 ]; break;
-        case 1: newDistance = distances[ pathJ ][ pathK ] + distances[ pathI ][ pathKminus1 ] + distances[ pathJminus1 ][ pathIminus1 ]; break;
-        case 2: newDistance = distances[ pathK ][ pathI ] + distances[ pathJ ][ pathIminus1 ] + distances[ pathKminus1 ][ pathJminus1 ]; break;
+    vector< double > newDistances( 3 );
+    newDistances[ 0 ] = distances[ pathI ][ pathJ ] + distances[ pathK ][ pathJminus1 ] + distances[ pathIminus1 ][ pathKminus1 ];
+    newDistances[ 1 ] = distances[ pathJ ][ pathK ] + distances[ pathI ][ pathKminus1 ] + distances[ pathJminus1 ][ pathIminus1 ];
+    newDistances[ 2 ] = distances[ pathK ][ pathI ] + distances[ pathJ ][ pathIminus1 ] + distances[ pathKminus1 ][ pathJminus1 ];
+    size_t minIndex= min_element( newDistances.begin(), newDistances.end() ) - newDistances.begin();
+    if ( newDistances[ minIndex ] < removedDistance ) {
+      switch ( minIndex ) {
+        case 0: update3OptIntervals_( path, i, j, false, k, i, false, kMinus1, jMinus1, true, distances ); break;
+        case 1: update3OptIntervals_( path, i, j, false, iMinus1, kMinus1, true, j, k, false, distances ); break;
+        case 2: update3OptIntervals_( path, i, j, false, kMinus1, jMinus1, true, iMinus1, kMinus1, true, distances ); break;
         default: assert( false );
       }
-      if ( newDistance < removedDistance && newDistance < bestDistance ) {
-        bestIndex = idx;
-        bestDistance = newDistance;
-      }
+      return true;
     }
-    switch( bestIndex ) {
-      case 0: update3OptIntervals_( path, i, j, false, k, i, false, kMinus1, jMinus1, true, distances ); return true;
-      case 1: update3OptIntervals_( path, i, j, false, iMinus1, kMinus1, true, j, k, false, distances ); return true;
-      case 2: update3OptIntervals_( path, i, j, false, kMinus1, jMinus1, true, iMinus1, kMinus1, true, distances ); return true;
-      default: return false;
-    }
-  }
-
-  void compute3OptPathRandom_( vector< size_t >& path,
-                               const vector< vector< double > >& distances )
-  {
-    bool changed = true;
-    size_t outerIter = 0;
-    while ( changed && outerIter < 100 ) {
-      changed = false;
-      ++outerIter;
-      vector< size_t > randNums( 3 );
-      for ( size_t iter = 0; iter < 10000; ++iter ) {
-        randNums[ 0 ] = rand() % distances.size();
-        randNums[ 1 ] = rand() % distances.size();
-        randNums[ 2 ] = rand() % distances.size();
-        sort( randNums.begin(), randNums.end() );
-        if ( randNums[ 0 ] == randNums[ 1 ] || randNums[ 1 ] == randNums[ 2 ] ) {
-          continue;
-        }
-        if ( update3Opt_( randNums[ 0 ], randNums[ 1 ], randNums[ 2 ], path, distances ) ) {
-          changed = true;
-        }
-      }
-    }
+    return false;
   }
 
   void compute3OptPath_( vector< size_t >& path,
@@ -378,17 +410,17 @@ restart3opt:
     }
   }
 
-  void make2OptMove_( size_t t0, size_t t1, size_t t2, size_t t3, vector< size_t >& path )
+  void make2OptMove_( size_t it0, size_t it1, size_t it2, size_t it3, vector< size_t >& path )
   {
-    cerr << t0 << " " << t1 << " " << t2 << " " << t3 << endl;
-    assert( fabs( fabs( float( t0 ) - float( t1 ) ) - 1.0 ) < 1e-6 );
-    assert( fabs( fabs( float( t2 ) - float( t3 ) ) - 1.0 ) < 1e-6 );
-    size_t ind1 = max( t0, t1 );
-    size_t ind2 = max( t2, t3 );
+    cerr << it0 << " " << it1 << " " << it2 << " " << it3 << endl;
+    assert( fabs( fabs( float( it0 ) - float( it1 ) ) - 1.0 ) < 1e-6 || fabs( fabs( float( it0 ) - float( it1 ) ) + 1.0 - float( path.size() ) ) < 1e-6  );
+    assert( fabs( fabs( float( it2 ) - float( it3 ) ) - 1.0 ) < 1e-6 || fabs( fabs( float( it2 ) - float( it3 ) ) + 1.0 - float( path.size() ) ) < 1e-6  );
+    size_t ind1 = max( it0, it1 );
+    size_t ind2 = max( it2, it3 );
     if ( ind1 > ind2 ) {
       swap( ind1, ind2 );
     }
-    reverse( path.begin() + ind1, path.begin() + ind2 + 1 );
+    reverse( path.begin() + ind1, path.begin() + ind2 );
   }
 
   bool update2Opt_( size_t i,
@@ -396,43 +428,21 @@ restart3opt:
                     vector< size_t >& path,
                     const vector< vector< double > >& distances )
   {
-    if ( i < 2 && j + 1 == path.size() ) {
-      return false;
-    }
+    assert( i < j );
     const double eps = 1e-9;
-    const size_t pathI = path[ i ];
-    const size_t pathJ = path[ j ];
-    const size_t pathJplus1 = path[ j + 1 == path.size() ? 0 : j + 1 ];
-    const size_t pathIminus1 = path[ i == 0 ? path.size() - 1 : i - 1 ];
-    if ( distances[ pathIminus1 ][ pathJ ] + distances[ pathI ][ pathJplus1 ] <
-         distances[ pathIminus1 ][ pathI ] + distances[ pathJ ][ pathJplus1 ] - eps ) {
-      reverse( path.begin() + i, path.begin() + j + 1 );
+    const size_t t0 = path[ i == 0 ? path.size() - 1 : i - 1 ];
+    const size_t t1 = path[ i ];
+    const size_t t2 = path[ j == 0 ? path.size() - 1 : j - 1 ];
+    const size_t t3 = path[ j ];
+//    if ( distances[ t1 ][ t3 ] > distances[ t0 ][ t1 ] + eps ) {
+//      return false;
+//    }
+    if ( distances[ t0 ][ t2 ] + distances[ t1 ][ t3 ] <
+         distances[ t0 ][ t1 ] + distances[ t2 ][ t3 ] - eps ) {
+      reverse( path.begin() + i, path.begin() + j );
       return true;
     }
     return false;
-  }
-
-  void compute2OptPathRandom_( vector< size_t >& path,
-                               const vector< vector< double > >& distances )
-  {
-    bool changed = true;
-    size_t outerIter = 0;
-    while ( changed && outerIter < 1000 ) {
-      changed = false;
-      ++outerIter;
-      vector< size_t > randNums( 2 );
-      for ( size_t iter = 0; iter < 10000; ++iter ) {
-        randNums[ 0 ] = rand() % distances.size();
-        randNums[ 1 ] = rand() % distances.size();
-        if ( randNums[ 0 ] == randNums[ 1 ] ) {
-          continue;
-        }
-        sort( randNums.begin(), randNums.end() );
-        if ( update2Opt_( randNums[ 0 ], randNums[ 1 ], path, distances ) ) {
-          changed = true;
-        }
-      }
-    }
   }
 
   void compute2OptPath_( vector< size_t >& path,
@@ -587,15 +597,9 @@ step7:
 
             if ( !nextYExists && maxKForIndEquals2 < path.size() ) {
               // Step 8. If there is an untried alternative for y_1, let i = 1 and go to Step 7
-              while ( y.size() > 1 ) {
-                y.pop_back();
-              }
-              while ( x.size() > 2 ) {
-                x.pop_back();
-              }
-              while ( t.size() > 4 ) {
-                t.pop_back();
-              }
+              y.resize( 1 );
+              x.resize( 2 );
+              t.resize( 4 );
               ind = 1;
               G = G0;
               goto step7;
@@ -622,7 +626,7 @@ namespace TravelingSalespersonProblemSolver {
 
     cerr << "Initial distance: " << getLength_( path, distances ) << endl;
     cerr << "Nearest neighbor distance: " << getLength_( pathNN, distances ) << endl;
-    if ( true ) {
+    if ( false ) {
       cerr << "1-tree distance: ";
       double start( clock() );
       double lowerBound = getHeldKarpLowerBound_( distances );
@@ -648,16 +652,15 @@ namespace TravelingSalespersonProblemSolver {
 
     if ( true ) {
       double start( clock() );
-      computeLinKernighanPath_( path, distances );
+//      computeLinKernighanPath_( path, distances );
       double time( ( clock() - start ) / CLOCKS_PER_SEC );
       cerr << "LK-opt path distance: " << getLength_( path, distances ) << ", time: " << setprecision( 4 ) << time << endl;
       assertIsPath_( path, distances );
     }
 
     if ( false ) {
-      compute2OptPathRandom_( path, distances );
-      compute3OptPathRandom_( path, distances );
       compute3OptPath_( path, distances );
+      computeLinKernighanPath_( path, distances );
     }
 
     return path;
