@@ -62,11 +62,8 @@ namespace {
       reverse( iIt, path.end() );
     }
   }
-//        case 0: reverse( path.begin() + i, path.begin() + j ); reverse( path.begin() + i, path.begin() + k ); break;
-//        case 1: reverse( path.begin() + i, path.begin() + j ); reverse( path.begin() + j, path.begin() + k ); break;
-//        case 2: reverse( path.begin() + i, path.begin() + k ); crossingReverse( path, k, i ); break;
 
-  void reverse( vector< size_t >& path, const size_t i, const size_t j )
+  void reverseShortest( vector< size_t >& path, const size_t i, const size_t j )
   {
     if ( j - i < path.size() + i - j ) {
       reverse( path.begin() + i, path.begin() + j );
@@ -116,6 +113,71 @@ namespace {
     return path;
   }
 
+  vector< size_t > getGreedyPath_( const vector< vector< double > >& distances )
+  {
+    // The greedy heuristic of matroid theory adds the shortest edge that neither
+    // makes the degree of a vertex greater than 2 nor creates a cycle shorter than N.
+    vector< size_t > degree( distances.size() );
+
+    vector< size_t > fragmentIndices( distances.size() );
+    vector< vector< size_t > > fragments( distances.size() );
+    for ( size_t i = 0; i < distances.size(); ++i ) {
+      fragments[ i ] = vector< size_t >( 1, i );
+      fragmentIndices[ i ] = i;
+    }
+    vector< pair< double, pair< size_t, size_t > > > edges;
+    edges.reserve( distances.size() * ( distances.size() - 1 ) / 2 );
+    for ( size_t i = 0; i < distances.size(); ++i ) {
+      for ( size_t j = i + 1; j < distances[ i ].size(); ++j ) {
+        edges.push_back( make_pair( distances[ i ][ j ], make_pair( i, j ) ) );
+      }
+    }
+    vector< pair< size_t, size_t > > addedEdges;
+    sort( edges.rbegin(), edges.rend() ); // sort from rbegin to rend => smallest element last
+    while ( edges.size() > 0 ) {
+      pair< size_t, size_t > edgeNodes = edges.back().second;
+      edges.pop_back();
+      size_t v1 = edgeNodes.first;
+      size_t v2 = edgeNodes.second;
+      if ( degree[ v1 ] < 2 && degree[ v2 ] < 2 && fragmentIndices[ v1 ] != fragmentIndices[ v2 ] ) {
+        assert( fragmentIndices[ v1 ] != (size_t)-1 );
+        assert( fragmentIndices[ v2 ] != (size_t)-1 );
+        vector< size_t >& f1 = fragments[ fragmentIndices[ v1 ] ];
+        vector< size_t >& f2 = fragments[ fragmentIndices[ v2 ] ];
+        assert( f1.front() == v1 || f1.back() == v1 );
+        assert( f2.front() == v2 || f2.back() == v2 );
+
+        if ( f1.front() == v1 ) {
+          reverse( f1.begin(), f1.end() );
+        }
+        if ( f2.back() == v2 ) {
+          reverse( f2.begin(), f2.end() );
+        }
+        f1.insert( f1.end(), f2.begin(), f2.end() );
+        fragmentIndices[ f2.back() ] = fragmentIndices[ v1 ];
+        f2.clear();
+        ++degree[ v1 ];
+        ++degree[ v2 ];
+        if ( degree[ v1 ] >= 2 ) {
+          fragmentIndices[ v1 ] = (size_t)-1;
+        }
+        if ( degree[ v2 ] >= 2 ) {
+          fragmentIndices[ v2 ] = (size_t)-1;
+        }
+      }
+    }
+    vector< size_t > path;
+    for ( size_t i = 0; i < fragments.size(); ++i ) {
+      if ( fragments[ i ].size() > 0 ) {
+        path.swap( fragments[ i ] );
+        break;
+      }
+    }
+
+    assertIsPath_( path, distances );
+    return path;
+  }
+
   vector< vector< size_t > > computeNearestNeighbors_( const vector< vector< double > >& distances,
                                                        size_t numberOfNeighbors )
   {
@@ -138,96 +200,12 @@ namespace {
     return nearestNeighbors;
   }
 
-  vector< size_t > getGreedyPath_( const vector< vector< double > >& distances )
+  double compute1TreeLength_( vector< size_t >& vertexDegrees,
+                              const vector< vector< double > >& distances,
+                              const vector< double >& lagrangeMultipliers )
   {
-    // The greedy heuristic of matroid theory
-    vector< size_t > degree( distances.size() );
-
-    vector< size_t > fragmentIndices( distances.size() );
-    vector< vector< size_t > > fragments( distances.size() );
-    for ( size_t i = 0; i < distances.size(); ++i ) {
-      fragments[ i ] = vector< size_t >( 1, i );
-      fragmentIndices[ i ] = i;
-    }
-    vector< pair< double, pair< size_t, size_t > > > edges;
-    edges.reserve( distances.size() * ( distances.size() - 1 ) / 2 );
-    for ( size_t i = 0; i < distances.size(); ++i ) {
-      for ( size_t j = i + 1; j < distances[ i ].size(); ++j ) {
-        edges.push_back( make_pair( distances[ i ][ j ], make_pair( i, j ) ) );
-      }
-    }
-    vector< pair< size_t, size_t > > addedEdges;
-    sort( edges.rbegin(), edges.rend() ); // rbegin-rend => smallest element last
-    while ( edges.size() > 0 ) {
-      pair< size_t, size_t > edgeNodes = edges.back().second;
-      edges.pop_back();
-      size_t v1 = edgeNodes.first;
-      size_t v2 = edgeNodes.second;
-      if ( degree[ v1 ] < 2 && degree[ v2 ] < 2 && fragmentIndices[ v1 ] != fragmentIndices[ v2 ] ) {
-        assert( fragmentIndices[ v1 ] != (size_t)-1 );
-        assert( fragmentIndices[ v2 ] != (size_t)-1 );
-        vector< size_t >& f1 = fragments[ fragmentIndices[ v1 ] ];
-        vector< size_t >& f2 = fragments[ fragmentIndices[ v2 ] ];
-        assert( f1.front() == v1 || f1.back() == v1 );
-
-        assert( f2.front() == v2 || f2.back() == v2 );
-        if ( f1.front() == v1 ) {
-          reverse( f1.begin(), f1.end() );
-        }
-        if ( f2.back() == v2 ) {
-          reverse( f2.begin(), f2.end() );
-        }
-        f1.insert( f1.end(), f2.begin(), f2.end() );
-        fragmentIndices[ f2.back() ] = fragmentIndices[ v1 ];
-
-        if ( degree[ v1 ] > 0 ) {
-          fragmentIndices[ v1 ] = (size_t)-1;
-        }
-        if ( degree[ v2 ] > 0 ) {
-          fragmentIndices[ v2 ] = (size_t)-1;
-        }
-        f2.clear();
-        ++degree[ v1 ];
-        ++degree[ v2 ];
-      }
-    }
-    vector< size_t > path;
-    for ( size_t i = 0; i < fragments.size(); ++i ) {
-      if ( fragments[ i ].size() > 0 ) {
-        path.swap( fragments[ i ] );
-        break;
-      }
-    }
-
-    assertIsPath_( path, distances );
-    return path;
-  }
-
-  struct Vertex {
-    Vertex( size_t index ) : index_( index ), degree_( 0 ) {}
-    size_t getIndex() const { return index_; }
-    const vector< size_t >& getChildren() const { return children_; }
-    void addChild( size_t index ) { children_.push_back( index ); }
-    void increaseDegree( size_t increment = 1) { degree_ += increment; }
-    size_t getDegree() const { return degree_; }
-    private:
-      size_t index_;
-      size_t degree_;
-      vector< size_t > children_;
-  };
-
-  double get1Tree_( vector< Vertex >& nodes,
-                    const vector< vector< double > >& distances,
-                    const vector< double >& lagrangeMultipliers )
-  {
-    // 1. Compute minimum spanning tree of the vertices excluding the first, using Prim's algorithm
-    for ( size_t i = 0; i < distances.size(); ++i ) {
-      nodes.push_back( Vertex( i ) );
-    }
-
-    vector< size_t > minimumSpanningTree;
-    minimumSpanningTree.reserve( distances.size() );
-    minimumSpanningTree.push_back( 1 );
+    // 1. Compute length minimum spanning tree of the vertices excluding the 0th, using Prim's algorithm
+    vertexDegrees.assign( distances.size(), 0 );
     vector< size_t > unusedVertices;
     unusedVertices.reserve( distances.size() );
     for ( size_t i = 2; i < distances.size(); ++i ) {
@@ -235,14 +213,10 @@ namespace {
     }
 
     // For each unused vertex i, closestTreeNode[ i ] points to the vertex in the tree which is closest to i
-    vector< size_t > closestTreeNode;
-    closestTreeNode.reserve( distances.size() );
-    for ( size_t i = 0; i < distances.size(); ++i ) {
-      closestTreeNode.push_back( 1 );
-    }
+    vector< size_t > closestTreeNode( distances.size(), 1 );
 
-    double length = 0.0;
-    while ( minimumSpanningTree.size() + 1 < distances.size() ) {
+    double treeLength = 0.0;
+    for ( size_t i = 0; i + 2 < distances.size(); ++i ) {
       size_t fromIndex = 0;
       vector< size_t >::iterator minIt = unusedVertices.begin();
       double minDistance = numeric_limits< double >::max();
@@ -256,11 +230,9 @@ namespace {
         }
       }
       size_t indexOfNewTreeNode = *minIt;
-      minimumSpanningTree.push_back( indexOfNewTreeNode );
-      length += minDistance;
-      nodes[ fromIndex ].addChild( indexOfNewTreeNode );
-      nodes[ fromIndex ].increaseDegree();
-      nodes[ indexOfNewTreeNode ].increaseDegree();
+      treeLength += minDistance;
+      ++vertexDegrees[ fromIndex ];
+      ++vertexDegrees[ indexOfNewTreeNode ];
       *minIt = unusedVertices.back();
       unusedVertices.pop_back();
 
@@ -277,48 +249,41 @@ namespace {
     // 2. Add the two shortest edges connecting to the first vertex
     double minElement = numeric_limits< double >::max();
     double secondMinElement = numeric_limits< double >::max();
-    size_t minIndex = (size_t)-1;
-    size_t secondMinIndex = (size_t)-1;
     for ( size_t i = 0; i < distances[ 0 ].size(); ++i ) {
       double value = distances[ 0 ][ i ] + lagrangeMultipliers[ 0 ] + lagrangeMultipliers[ i ];
       if ( value < secondMinElement ) {
         secondMinElement = value;
-        secondMinIndex = i;
         if ( value < minElement ) {
           secondMinElement = minElement;
-          secondMinIndex = minIndex;
           minElement = value;
-          minIndex = i;
         }
       }
     }
-    nodes[ 0 ].addChild( minIndex );
-    nodes[ 0 ].addChild( secondMinIndex );
-    nodes[ 0 ].increaseDegree( 2 );
+    vertexDegrees[ 0 ] = 2;
 
-    length += minElement + secondMinElement;
-    return length - 2.0 * accumulate( lagrangeMultipliers.begin(), lagrangeMultipliers.end(), 0.0 );
+    treeLength += minElement + secondMinElement;
+    return treeLength - 2.0 * accumulate( lagrangeMultipliers.begin(), lagrangeMultipliers.end(), 0.0 );
   }
 
   double getHeldKarpLowerBound_( const vector< vector< double > >& distances )
   {
     double bestLength = numeric_limits< double >::min();
-    double length = numeric_limits< double >::min();
+    double treeLength = numeric_limits< double >::min();
     vector< double > lagrangeMultipliers( distances.size() );
     double lambda = 0.1;
     for ( size_t i = 0; i < 50; ++i ) {
-      vector< Vertex > nodes;
-      length = get1Tree_( nodes, distances, lagrangeMultipliers );
-      bestLength = max( bestLength, length );
+      vector< size_t > vertexDegrees;
+      treeLength = compute1TreeLength_( vertexDegrees, distances, lagrangeMultipliers );
+      bestLength = max( bestLength, treeLength );
       double denominator = 0.0;
       for ( size_t j = 0; j < lagrangeMultipliers.size(); ++j ) {
-        double d = double( nodes[ j ].getDegree() ) - 2.0;
+        double d = double( vertexDegrees[ j ] ) - 2.0;
         denominator += d * d;
       }
-      double t = 2.0 * lambda * length / denominator;
+      double t = 2.0 * lambda * treeLength / denominator;
 
       for ( size_t j = 0; j < lagrangeMultipliers.size(); ++j ) {
-        lagrangeMultipliers[ j ] += t * ( int( nodes[ j ].getDegree() ) - 2 );
+        lagrangeMultipliers[ j ] += t * ( int( vertexDegrees[ j ] ) - 2 );
       }
       lambda = 1.0 / ( 20.0 + 10 * i );
     }
@@ -374,7 +339,7 @@ namespace {
       cerr << pathIdx << " " << path.size() << endl;
     }
     assert( pathIdx == path.size() );
-//    assert( getLength_( path, distances ) < getLength_( pathCopy, distances ) );
+    assert( getLength_( path, distances ) < getLength_( pathCopy, distances ) );
   }
 
   bool update3Opt_( size_t i,
@@ -409,11 +374,11 @@ namespace {
     size_t minIndex = min_element( newDistances.begin(), newDistances.end() ) - newDistances.begin();
     if ( newDistances[ minIndex ] < removedDistance ) {
       switch ( minIndex ) {
-//        case 0: reverse( path.begin() + i, path.begin() + j ); reverse( path.begin() + i, path.begin() + k ); break;
-//        case 1: reverse( path.begin() + i, path.begin() + j ); reverse( path.begin() + j, path.begin() + k ); break;
+        case 0: reverse( path.begin() + i, path.begin() + j ); reverse( path.begin() + i, path.begin() + k ); break;
+        case 1: reverse( path.begin() + i, path.begin() + j ); reverse( path.begin() + j, path.begin() + k ); break;
 //        case 2: reverse( path.begin() + i, path.begin() + k ); crossingReverse( path, k, i ); break;
-        case 0: update3OptIntervals_( path, i, j, false, k, i, false, kMinus1, jMinus1, true, distances ); break;
-        case 1: update3OptIntervals_( path, i, j, false, iMinus1, kMinus1, true, j, k, false, distances ); break;
+//        case 0: update3OptIntervals_( path, i, j, false, k, i, false, kMinus1, jMinus1, true, distances ); break;
+//        case 1: update3OptIntervals_( path, i, j, false, iMinus1, kMinus1, true, j, k, false, distances ); break;
         case 2: update3OptIntervals_( path, i, j, false, kMinus1, jMinus1, true, iMinus1, kMinus1, true, distances ); break;
         case 3: update3OptIntervals_( path, i, j, false, k, i, false, j, k, false, distances ); break;
         default: assert( false );
@@ -423,12 +388,11 @@ namespace {
     return false;
   }
 
-  /*
-  bool getGain_( size_t i,
-                 size_t j,
-                 size_t k,
-                 vector< size_t >& path,
-                 const vector< vector< double > >& distances )
+  double getGain_( size_t i,
+                   size_t j,
+                   size_t k,
+                   vector< size_t >& path,
+                   const vector< vector< double > >& distances )
   {
     vector< size_t > vertices( 3 );
     vertices[ 0 ] = i; vertices[ 1 ] = j; vertices[ 2 ] = k;
@@ -456,26 +420,6 @@ namespace {
     size_t minIndex = min_element( newDistances.begin(), newDistances.end() ) - newDistances.begin();
     return removedDistance - newDistances[ minIndex ];
   }
-  */
-
-  void compute3OptPath_( vector< size_t >& path,
-                         const vector< vector< double > >& distances )
-  {
-    bool changed = true;
-    while ( changed ) {
-      changed = false;
-      for ( size_t i = 0; i < path.size(); ++i ) {
-        for ( size_t j = i + 1; j < path.size(); ++j ) {
-          for ( size_t k = j + 1; k < path.size(); ++k ) {
-            if ( update3Opt_( i, j, k, path, distances ) ) {
-              changed = true;
-              break;
-            }
-          }
-        }
-      }
-    }
-  }
 
   void compute3OptPath_( vector< size_t >& path,
                          const vector< vector< double > >& distances,
@@ -490,11 +434,11 @@ namespace {
       changed = false;
       for ( size_t i = 0; i < path.size(); ++i ) {
         for ( vector< size_t >::const_iterator jIt = nearestNeighbors[ i ].begin(); jIt != nearestNeighbors[ i ].end(); ++jIt ) {
-          size_t indexOfIInPath = position[ i ]; //find( path.begin(), path.end(), i ) - path.begin();
-          size_t indexOfJInPath = position[ *jIt ]; //find( path.begin(), path.end(), *jIt ) - path.begin();
+          size_t indexOfIInPath = position[ i ];
+          size_t indexOfJInPath = position[ *jIt ];
           assert( indexOfJInPath != indexOfIInPath );
           for ( vector< size_t >::const_iterator kIt = nearestNeighbors[ *jIt ].begin(); kIt != nearestNeighbors[ *jIt ].end(); ++kIt ) {
-            size_t indexOfKInPath = position[ *kIt ]; //find( path.begin(), path.end(), *kIt ) - path.begin();
+            size_t indexOfKInPath = position[ *kIt ];
             assert( indexOfKInPath != indexOfJInPath );
             if ( indexOfKInPath == indexOfIInPath ) {
               continue;
@@ -512,44 +456,62 @@ namespace {
     }
   }
 
-  void compute3OptPathOld_( vector< size_t >& path,
-                            const vector< vector< double > >& distances,
-                            const vector< vector< size_t > >& nearestNeighbors )
+  /*
+  void compute3OptPath2_( vector< size_t >& path,
+                         const vector< vector< double > >& distances,
+                         const vector< vector< size_t > >& nearestNeighbors )
   {
-restart3opt:
+    vector< size_t > position( path.size() );
     for ( size_t i = 0; i < path.size(); ++i ) {
-      size_t indexOfIInPath = find( path.begin(), path.end(), i ) - path.begin();
-      for ( vector< size_t >::const_iterator jIt = nearestNeighbors[ i ].begin(); jIt != nearestNeighbors[ i ].end(); ++jIt ) {
-        size_t indexOfJInPath = find( path.begin(), path.end(), *jIt ) - path.begin();
-        assert( indexOfJInPath != indexOfIInPath );
-        for ( vector< size_t >::const_iterator kIt = nearestNeighbors[ *jIt ].begin(); kIt != nearestNeighbors[ *jIt ].end(); ++kIt ) {
-          size_t indexOfKInPath = find( path.begin(), path.end(), *kIt ) - path.begin();
-          assert( indexOfKInPath != indexOfJInPath );
-          if ( indexOfKInPath == indexOfIInPath ) {
-            continue;
-          }
+      position[ path[ i ] ] = i;
+    }
+    bool changed = true;
+    while ( changed ) {
+      changed = false;
+      for ( size_t i = 0; i < path.size(); ++i ) {
+        for ( vector< size_t >::const_iterator jIt = nearestNeighbors[ i ].begin(); jIt != nearestNeighbors[ i ].end(); ++jIt ) {
+          size_t bestI = 0;
+          size_t bestJ = 0;
+          size_t bestK = 0;
+          double bestGain = 0.0;
+          size_t numGains = 0;
 
-          if ( update3Opt_( indexOfIInPath, indexOfJInPath, indexOfKInPath, path, distances ) ) {
-            goto restart3opt;
+          size_t indexOfIInPath = position[ i ];
+          size_t indexOfJInPath = position[ *jIt ];
+          assert( indexOfJInPath != indexOfIInPath );
+          for ( vector< size_t >::const_iterator kIt = nearestNeighbors[ *jIt ].begin(); kIt != nearestNeighbors[ *jIt ].end(); ++kIt ) {
+            size_t indexOfKInPath = position[ *kIt ];
+            assert( indexOfKInPath != indexOfJInPath );
+            if ( indexOfKInPath == indexOfIInPath ) {
+              continue;
+            }
+            double gain = getGain_( indexOfIInPath, indexOfJInPath, indexOfKInPath, path, distances ) ;
+            if ( gain > 0 ) {
+              ++numGains;
+            }
+            if ( gain > bestGain ) {
+              bestGain = gain;
+              bestI = indexOfIInPath;
+              bestJ = indexOfJInPath;
+              bestK = indexOfKInPath;
+              changed = true;
+            }
+            if ( numGains >= 8 ) {
+              break;
+            }
+          }
+          if ( bestGain > 0.0 ) {
+            assert( update3Opt_( bestI, bestJ, bestK, path, distances ) );
+            for ( size_t pi = 0; pi < path.size(); ++pi ) {
+              position[ path[ pi ] ] = pi;
+            }
+            break;
           }
         }
       }
     }
   }
-
-
-  void make2OptMove_( size_t it0, size_t it1, size_t it2, size_t it3, vector< size_t >& path )
-  {
-    cerr << it0 << " " << it1 << " " << it2 << " " << it3 << endl;
-    assert( fabs( fabs( float( it0 ) - float( it1 ) ) - 1.0 ) < 1e-6 || fabs( fabs( float( it0 ) - float( it1 ) ) + 1.0 - float( path.size() ) ) < 1e-6  );
-    assert( fabs( fabs( float( it2 ) - float( it3 ) ) - 1.0 ) < 1e-6 || fabs( fabs( float( it2 ) - float( it3 ) ) + 1.0 - float( path.size() ) ) < 1e-6  );
-    size_t ind1 = max( it0, it1 );
-    size_t ind2 = max( it2, it3 );
-    if ( ind1 > ind2 ) {
-      swap( ind1, ind2 );
-    }
-    reverse( path.begin() + ind1, path.begin() + ind2 );
-  }
+  */
 
   bool update2Opt_( size_t i,
                     size_t j,
@@ -562,9 +524,6 @@ restart3opt:
     const size_t t1 = path[ i ];
     const size_t t2 = path[ j == 0 ? path.size() - 1 : j - 1 ];
     const size_t t3 = path[ j % path.size() ];
-//    if ( distances[ t0 ][ t1 ] < distances[ t1 ][ t3 ] ) {
-//      return false;
-//    }
     if ( distances[ t0 ][ t2 ] + distances[ t1 ][ t3 ] <
          distances[ t0 ][ t1 ] + distances[ t2 ][ t3 ] - eps ) {
       reverse( path.begin() + i, path.begin() + j );
@@ -608,29 +567,11 @@ restart3opt:
           }
         }
         if ( bestGain > 0.0 ) {
-          reverse( path.begin() + bestI, path.begin() + bestJ );
+          assert( update2Opt_( bestI, bestJ, path, distances ) );
         }
       }
     }
     assertIsPath_( path, distances );
-  }
-
-  void compute2OptPath2_( vector< size_t >& path,
-                         const vector< vector< double > >& distances )
-  {
-    bool changed = true;
-    while ( changed ) {
-      changed = false;
-      for ( size_t i = 0; i < path.size(); ++i ) {
-        // Cutting the edges of two neighboring nodes does not lead to a new path. Hence start from i + 2.
-        for ( size_t j = i + 2; j < path.size(); ++j ) {
-          if ( update2Opt_( i, j, path, distances ) ) {
-            changed = true;
-            break;
-          }
-        }
-      }
-    }
   }
 
   bool contains_( const vector< pair< size_t, size_t > >& xs, const pair< size_t, size_t >& x )
@@ -644,6 +585,19 @@ restart3opt:
       }
     }
     return false;
+  }
+
+  void make2OptMove_( size_t it0, size_t it1, size_t it2, size_t it3, vector< size_t >& path )
+  {
+    cerr << it0 << " " << it1 << " " << it2 << " " << it3 << endl;
+    assert( fabs( fabs( float( it0 ) - float( it1 ) ) - 1.0 ) < 1e-6 || fabs( fabs( float( it0 ) - float( it1 ) ) + 1.0 - float( path.size() ) ) < 1e-6  );
+    assert( fabs( fabs( float( it2 ) - float( it3 ) ) - 1.0 ) < 1e-6 || fabs( fabs( float( it2 ) - float( it3 ) ) + 1.0 - float( path.size() ) ) < 1e-6  );
+    size_t ind1 = max( it0, it1 );
+    size_t ind2 = max( it2, it3 );
+    if ( ind1 > ind2 ) {
+      swap( ind1, ind2 );
+    }
+    reverse( path.begin() + ind1, path.begin() + ind2 );
   }
 
   void computeLinKernighanPath_( vector< size_t >& path,
@@ -825,54 +779,12 @@ namespace TravelingSalespersonProblemSolver {
     vector< size_t > pathNN = getNearestNeighborPath_( distances );
     vector< size_t > pathGreedy = getGreedyPath_( distances );
     vector< size_t > path( pathGreedy );
-    vector< vector< size_t > > nearestNeighbors = computeNearestNeighbors_( distances, 10 );
+    vector< vector< size_t > > nearestNeighbors = computeNearestNeighbors_( distances, 20 );
 
     cerr << "Initial distance: " << getLength_( path, distances ) << endl;
     cerr << "Nearest neighbor distance: " << getLength_( pathNN, distances ) << endl;
     cerr << "Greedy distance: " << getLength_( pathGreedy, distances ) << endl;
-    /*
-    for ( size_t i = 0; i < 100; ++i ) {
-      pathRand = getRandomPath_( distances );
-      pathNN  = pathRand;
-      size_t ii = 0;
-      size_t ji = 0;
-      size_t ki = 0;
-      while ( ii >= ji || ji >= ki || ii >= ki ) {
-        ii = rand() % path.size();
-        ji = rand() % path.size();
-        ki = rand() % path.size();
-      }
 
-    const size_t iMinus1 = ( ii + path.size() - 1 ) % path.size();
-    const size_t jMinus1 = ( ji + path.size() - 1 ) % path.size();
-    const size_t kMinus1 = ( ki + path.size() - 1 ) % path.size();
-
-
-      reverse( pathRand.begin() + ii, pathRand.begin() + ji );
-      reverse( pathRand.begin() + ji, pathRand.begin() + ki );
-
-      update3OptIntervals_( pathNN, ii, ji, false, iMinus1, kMinus1, true, ji, ki, false, distances );
- reverse( path.begin() + ii, path.begin() + ji ); reverse( path.begin() + ii, path.begin() + ki );
- update3OptIntervals_( path, ii, ji, false, ki, ii, false, kMinus1, jMinus1, true, distances );
-
-//      reverse( pathRand.begin(), pathRand.end() );
-      size_t i1 = find( pathRand.begin(), pathRand.end(), 0 ) - pathRand.begin();
-      size_t i2 = find( pathNN.begin(), pathNN.end(), 0 ) - pathNN.begin();
-
-      for ( size_t j = 0; j < path.size(); ++j ) {
-//        cerr << pathRand[ i1 % path.size() ] << " ";
- //       cerr << pathNN[ i2 % path.size() ] << " ";
-        assert( pathRand[ i1 % path.size() ] == pathNN[ i2 % path.size() ] );
-        ++i1; ++i2;
-      }
-      cerr << endl;
-      for ( size_t j = 0; j < path.size(); ++j ) {
-//        cerr << pathNN[ j ] << " ";
-        ++i1; ++i2;
-      }
-      cerr << endl;
-    }
-*/
     if ( true ) {
       cerr << "1-tree distance: ";
       double start( clock() );
@@ -906,7 +818,6 @@ namespace TravelingSalespersonProblemSolver {
     }
 
     if ( false ) {
-      compute3OptPath_( path, distances );
       computeLinKernighanPath_( path, distances );
     }
 
