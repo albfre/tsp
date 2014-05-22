@@ -350,16 +350,18 @@ namespace {
     const double removedDistance = distances[ pathIminus1 ][ pathI ] +
                                    distances[ pathJminus1 ][ pathJ ] +
                                    distances[ pathKminus1 ][ pathK ] - eps; // subtract a little something to avoid numerical errors
-    vector< double > newDistances( 3 );
+    vector< double > newDistances( 4 );
     newDistances[ 0 ] = distances[ pathI ][ pathJ ] + distances[ pathK ][ pathJminus1 ] + distances[ pathIminus1 ][ pathKminus1 ];
     newDistances[ 1 ] = distances[ pathJ ][ pathK ] + distances[ pathI ][ pathKminus1 ] + distances[ pathJminus1 ][ pathIminus1 ];
     newDistances[ 2 ] = distances[ pathK ][ pathI ] + distances[ pathJ ][ pathIminus1 ] + distances[ pathKminus1 ][ pathJminus1 ];
-    size_t minIndex= min_element( newDistances.begin(), newDistances.end() ) - newDistances.begin();
+    newDistances[ 3 ] = distances[ pathI ][ pathKminus1 ] + distances[ pathJ ][ pathIminus1 ] + distances[ pathK ][ pathJminus1 ];
+    size_t minIndex = min_element( newDistances.begin(), newDistances.end() ) - newDistances.begin();
     if ( newDistances[ minIndex ] < removedDistance ) {
       switch ( minIndex ) {
         case 0: update3OptIntervals_( path, i, j, false, k, i, false, kMinus1, jMinus1, true, distances ); break;
         case 1: update3OptIntervals_( path, i, j, false, iMinus1, kMinus1, true, j, k, false, distances ); break;
         case 2: update3OptIntervals_( path, i, j, false, kMinus1, jMinus1, true, iMinus1, kMinus1, true, distances ); break;
+        case 3: update3OptIntervals_( path, i, j, false, k, i, false, j, k, false, distances ); break;
         default: assert( false );
       }
       return true;
@@ -386,6 +388,17 @@ namespace {
     }
   }
 
+  bool neighbors_( size_t i, size_t j, const vector< size_t > path )
+  {
+    if ( i < j ) {
+      swap( i, j );
+    }
+    if ( i + 1 == path.size() && j == 0 ) {
+      return true;
+    }
+    return j + 1 == i;
+  }
+
   void compute3OptPath_( vector< size_t >& path,
                          const vector< vector< double > >& distances,
                          const vector< vector< size_t > >& nearestNeighbors )
@@ -402,6 +415,7 @@ restart3opt:
           if ( indexOfKInPath == indexOfIInPath ) {
             continue;
           }
+
           if ( update3Opt_( indexOfIInPath, indexOfJInPath, indexOfKInPath, path, distances ) ) {
             goto restart3opt;
           }
@@ -452,7 +466,8 @@ restart3opt:
     while ( changed ) {
       changed = false;
       for ( size_t i = 0; i < path.size(); ++i ) {
-        for ( size_t j = i + 1; j < path.size(); ++j ) {
+        // Cutting the edges of two neighboring nodes does not lead to a new path. Hence start from i + 2.
+        for ( size_t j = i + 2; j < path.size(); ++j ) {
           if ( update2Opt_( i, j, path, distances ) ) {
             changed = true;
             break;
@@ -626,7 +641,7 @@ namespace TravelingSalespersonProblemSolver {
 
     cerr << "Initial distance: " << getLength_( path, distances ) << endl;
     cerr << "Nearest neighbor distance: " << getLength_( pathNN, distances ) << endl;
-    if ( false ) {
+    if ( true ) {
       cerr << "1-tree distance: ";
       double start( clock() );
       double lowerBound = getHeldKarpLowerBound_( distances );
@@ -642,7 +657,7 @@ namespace TravelingSalespersonProblemSolver {
       assertIsPath_( path, distances );
     }
 
-    if ( false ) {
+    if ( true ) {
       double start( clock() );
       compute3OptPath_( path, distances, nearestNeighbors );
       double time( ( clock() - start ) / CLOCKS_PER_SEC );
