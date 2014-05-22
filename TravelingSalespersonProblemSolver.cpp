@@ -45,6 +45,7 @@ namespace {
     return path;
   }
 
+  /*
   void crossingReverse( vector< size_t >& path, const size_t i, const size_t j )
   {
     assert( i > j );
@@ -83,6 +84,7 @@ namespace {
       }
     }
   }
+  */
 
   vector< size_t > getNearestNeighborPath_( const vector< vector< double > >& distances )
   {
@@ -204,16 +206,34 @@ namespace {
                               const vector< vector< double > >& distances,
                               const vector< double >& lagrangeMultipliers )
   {
-    // 1. Compute length minimum spanning tree of the vertices excluding the 0th, using Prim's algorithm
     vertexDegrees.assign( distances.size(), 0 );
-    vector< size_t > unusedVertices;
-    unusedVertices.reserve( distances.size() );
-    for ( size_t i = 2; i < distances.size(); ++i ) {
-      unusedVertices.push_back( i );
+
+    // 1. Compute length of the minimum spanning tree excluding one vertex, using Prim's algorithm.
+    size_t minimaxVertex = 0;
+    double minimaxValue = *max_element( distances[ 0 ].begin(), distances[ 0 ].end() );
+    for ( size_t i = 1; i < distances.size(); ++i ) {
+      double value = *max_element( distances[ i ].begin(), distances[ i ].end() );
+      if ( value < minimaxValue ) {
+        minimaxValue = value;
+        minimaxVertex = i;
+      }
     }
 
-    // For each unused vertex i, closestTreeNode[ i ] points to the vertex in the tree which is closest to i
-    vector< size_t > closestTreeNode( distances.size(), 1 );
+    vector< size_t > unusedVertices;
+    unusedVertices.reserve( distances.size() - 1 );
+    for ( size_t i = 0; i < distances.size(); ++i ) {
+      if ( i != minimaxVertex ) {
+        unusedVertices.push_back( i );
+      }
+    }
+
+    // Popping one element means that it is added to the tree; add the root to the tree.
+    size_t rootVertex = unusedVertices.back();
+    unusedVertices.pop_back();
+
+    // For each unused vertex i, closestTreeNode[ i ] points to the vertex in the tree which is closest to i.
+    vector< size_t > closestTreeNode( distances.size(), rootVertex );
+
 
     double treeLength = 0.0;
     for ( size_t i = 0; i + 2 < distances.size(); ++i ) {
@@ -388,6 +408,7 @@ namespace {
     return false;
   }
 
+  /*
   double getGain_( size_t i,
                    size_t j,
                    size_t k,
@@ -421,42 +442,6 @@ namespace {
     return removedDistance - newDistances[ minIndex ];
   }
 
-  void compute3OptPath_( vector< size_t >& path,
-                         const vector< vector< double > >& distances,
-                         const vector< vector< size_t > >& nearestNeighbors )
-  {
-    vector< size_t > position( path.size() );
-    for ( size_t i = 0; i < path.size(); ++i ) {
-      position[ path[ i ] ] = i;
-    }
-    bool changed = true;
-    while ( changed ) {
-      changed = false;
-      for ( size_t i = 0; i < path.size(); ++i ) {
-        for ( vector< size_t >::const_iterator jIt = nearestNeighbors[ i ].begin(); jIt != nearestNeighbors[ i ].end(); ++jIt ) {
-          size_t indexOfIInPath = position[ i ];
-          size_t indexOfJInPath = position[ *jIt ];
-          assert( indexOfJInPath != indexOfIInPath );
-          for ( vector< size_t >::const_iterator kIt = nearestNeighbors[ *jIt ].begin(); kIt != nearestNeighbors[ *jIt ].end(); ++kIt ) {
-            size_t indexOfKInPath = position[ *kIt ];
-            assert( indexOfKInPath != indexOfJInPath );
-            if ( indexOfKInPath == indexOfIInPath ) {
-              continue;
-            }
-            if ( update3Opt_( indexOfIInPath, indexOfJInPath, indexOfKInPath, path, distances ) ) {
-              changed = true;
-              for ( size_t i = 0; i < path.size(); ++i ) {
-                position[ path[ i ] ] = i;
-              }
-              break;
-            }
-          }
-        }
-      }
-    }
-  }
-
-  /*
   void compute3OptPath2_( vector< size_t >& path,
                          const vector< vector< double > >& distances,
                          const vector< vector< size_t > >& nearestNeighbors )
@@ -512,6 +497,41 @@ namespace {
     }
   }
   */
+
+  void compute3OptPath_( vector< size_t >& path,
+                         const vector< vector< double > >& distances,
+                         const vector< vector< size_t > >& nearestNeighbors )
+  {
+    vector< size_t > position( path.size() );
+    for ( size_t i = 0; i < path.size(); ++i ) {
+      position[ path[ i ] ] = i;
+    }
+    bool changed = true;
+    while ( changed ) {
+      changed = false;
+      for ( size_t i = 0; i < path.size(); ++i ) {
+        for ( vector< size_t >::const_iterator jIt = nearestNeighbors[ i ].begin(); jIt != nearestNeighbors[ i ].end(); ++jIt ) {
+          size_t indexOfIInPath = position[ i ];
+          size_t indexOfJInPath = position[ *jIt ];
+          assert( indexOfJInPath != indexOfIInPath );
+          for ( vector< size_t >::const_iterator kIt = nearestNeighbors[ *jIt ].begin(); kIt != nearestNeighbors[ *jIt ].end(); ++kIt ) {
+            size_t indexOfKInPath = position[ *kIt ];
+            assert( indexOfKInPath != indexOfJInPath );
+            if ( indexOfKInPath == indexOfIInPath ) {
+              continue;
+            }
+            if ( update3Opt_( indexOfIInPath, indexOfJInPath, indexOfKInPath, path, distances ) ) {
+              changed = true;
+              for ( size_t i = 0; i < path.size(); ++i ) {
+                position[ path[ i ] ] = i;
+              }
+              break;
+            }
+          }
+        }
+      }
+    }
+  }
 
   bool update2Opt_( size_t i,
                     size_t j,
@@ -774,6 +794,14 @@ namespace TravelingSalespersonProblemSolver {
     srand( 1729 );
     for ( size_t i = 0; i < distances.size(); ++i ) {
       assert( distances.size() == distances[ i ].size() );
+      for ( size_t j = 0; j < distances.size(); ++j ) {
+        if ( i != j ) {
+          assert( distances[ i ][ j ] > 0.0 );
+        }
+        else {
+          assert( distances[ i ][ i ] == 0.0 );
+        }
+      }
     }
     vector< size_t > pathRand = getRandomPath_( distances );
     vector< size_t > pathNN = getNearestNeighborPath_( distances );
@@ -781,6 +809,7 @@ namespace TravelingSalespersonProblemSolver {
     vector< size_t > path( pathGreedy );
     vector< vector< size_t > > nearestNeighbors = computeNearestNeighbors_( distances, 20 );
 
+    cerr << setprecision( 7 );
     cerr << "Initial distance: " << getLength_( path, distances ) << endl;
     cerr << "Nearest neighbor distance: " << getLength_( pathNN, distances ) << endl;
     cerr << "Greedy distance: " << getLength_( pathGreedy, distances ) << endl;
@@ -790,14 +819,14 @@ namespace TravelingSalespersonProblemSolver {
       double start( clock() );
       double lowerBound = getHeldKarpLowerBound_( distances );
       double time( ( clock() - start ) / CLOCKS_PER_SEC );
-      cerr << lowerBound << ", time: " << setprecision( 4 ) << time << endl;
+      cerr << lowerBound << ", time: " << time << endl;
     }
 
     if ( true ) {
       double start( clock() );
       compute2OptPath_( path, distances );
       double time( ( clock() - start ) / CLOCKS_PER_SEC );
-      cerr << "2-opt path distance: " << setprecision( 4 ) << getLength_( path, distances ) << ", time: " << time << endl;
+      cerr << "2-opt path distance: " << getLength_( path, distances ) << ", time: " << time << endl;
       assertIsPath_( path, distances );
     }
 
@@ -805,7 +834,7 @@ namespace TravelingSalespersonProblemSolver {
       double start( clock() );
       compute3OptPath_( path, distances, nearestNeighbors );
       double time( ( clock() - start ) / CLOCKS_PER_SEC );
-      cerr << "3-opt path distance: " << setprecision( 4 ) << getLength_( path, distances ) << ", time: " << time << endl;
+      cerr << "3-opt path distance: " << getLength_( path, distances ) << ", time: " << time << endl;
       assertIsPath_( path, distances );
     }
 
@@ -813,7 +842,7 @@ namespace TravelingSalespersonProblemSolver {
       double start( clock() );
 //      computeLinKernighanPath_( path, distances );
       double time( ( clock() - start ) / CLOCKS_PER_SEC );
-      cerr << "LK-opt path distance: " << getLength_( path, distances ) << ", time: " << setprecision( 4 ) << time << endl;
+      cerr << "LK-opt path distance: " << getLength_( path, distances ) << ", time: " << time << endl;
       assertIsPath_( path, distances );
     }
 

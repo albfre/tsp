@@ -27,7 +27,45 @@ double computeDistance( const vector< double >& point1, const vector< double >& 
   return sqrt( dist );
 }
 
-void testTSP( size_t numOfPoints )
+void testTSPRegular( size_t numOfPoints )
+{
+  vector< vector< double > > points;
+  size_t rows = size_t( sqrt( double( numOfPoints ) ) );
+  for ( size_t i = 0; i < rows; ++i ) {
+    for ( size_t j = 0; j < rows; ++j ) {
+      points.push_back( vector< double >( 2 ) );
+      points.back()[ 0 ] = 0.2 * ( j + 0.5 * ( i % 2 ) );
+      points.back()[ 1 ] = sqrt( 0.2 * 0.2 - 0.1 * 0.1 ) * i;
+    }
+  }
+  for ( size_t i = 0; i < numOfPoints / 10; ++i ) {
+    size_t ind = rand() % points.size();
+    points.erase( points.begin() + ind );
+  }
+  numOfPoints = points.size();
+
+
+  vector< vector< double > > distances( numOfPoints + 1, vector< double >( numOfPoints + 1, 1e5 ) );
+  for ( size_t i = 0; i < numOfPoints; ++i ) {
+    for ( size_t j = i + 1; j < numOfPoints; ++j ) {
+      distances[ i ][ j ] = computeDistance( points[ i ], points[ j ] );
+      distances[ j ][ i ] = distances[ i ][ j ];
+    }
+    distances[ i ][ i ] = 0.0;
+  }
+  distances.back().back() = 0.0;
+  distances.back()[ 0 ] = 1e-6;
+  distances[ 0 ].back() = 1e-6;
+
+  cout << "Running test on regular instance with " << numOfPoints << " points." << endl;
+  double start( clock() );
+  vector< size_t > path = computePath( distances );
+  size_t ii = find( path.begin(), path.end(), numOfPoints ) - path.begin();
+  cerr << "First point: " << path[ ( ii + 1 ) % path.size() ] << endl;
+  cout << "CPU seconds to run test: " << setprecision( 4 ) << ( clock() - start ) / CLOCKS_PER_SEC << endl;;
+}
+
+void testTSPRandom( size_t numOfPoints )
 {
   vector< vector< double > > points( numOfPoints, vector< double >( 2 ) );
   for ( size_t i = 0; i < numOfPoints; ++i ) {
@@ -40,9 +78,10 @@ void testTSP( size_t numOfPoints )
       distances[ i ][ j ] = computeDistance( points[ i ], points[ j ] );
       distances[ j ][ i ] = distances[ i ][ j ];
     }
+    distances[ i ][ i ] = 0.0;
   }
 
-  cout << "Running test with " << numOfPoints << " points." << endl;
+  cout << "Running test on random instance with " << numOfPoints << " points." << endl;
   double start( clock() );
   vector< size_t > path = computePath( distances );
   cout << "CPU seconds to run test: " << setprecision( 4 ) << ( clock() - start ) / CLOCKS_PER_SEC << endl;;
@@ -53,10 +92,14 @@ int main( int argc, const char* argv[] )
   bool standardTest = argc == 1;
 
   if ( standardTest ) {
-    testTSP( 50 );
+    testTSPRandom( 50 );
+  }
+  else if ( argc == 2 ) {
+    size_t numOfPoints = atoi( argv[ 1 ] );
+    testTSPRandom( numOfPoints );
   }
   else {
-    size_t numOfPoints = atoi( argv[ 1 ] );
-    testTSP( numOfPoints );
+    size_t numOfPoints = atoi( argv[ 2 ] );
+    testTSPRegular( numOfPoints );
   }
 }
