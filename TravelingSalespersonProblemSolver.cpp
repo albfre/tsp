@@ -409,6 +409,39 @@ namespace {
     return false;
   }
 
+  bool getGain_( size_t i,
+                 size_t j,
+                 size_t k,
+                 vector< size_t >& path,
+                 const vector< vector< double > >& distances )
+  {
+    vector< size_t > vertices( 3 );
+    vertices[ 0 ] = i; vertices[ 1 ] = j; vertices[ 2 ] = k;
+    sort( vertices.begin(), vertices.end() );
+    i = vertices[ 0 ]; j = vertices[ 1 ]; k = vertices[ 2 ];
+    assert( i < j && j < k );
+    const size_t pathI = path[ i ];
+    const size_t iMinus1 = ( i + path.size() - 1 ) % path.size();
+    const size_t pathIminus1 = path[ iMinus1 ];
+    const size_t pathJ = path[ j ];
+    const size_t jMinus1 = ( j + path.size() - 1 ) % path.size();
+    const size_t pathJminus1 = path[ jMinus1 ];
+    const size_t pathK = path[ k ];
+    const size_t kMinus1 = ( k + path.size() - 1 ) % path.size();
+    const size_t pathKminus1 = path[ kMinus1 ];
+    const double eps = 1e-9;
+    const double removedDistance = distances[ pathIminus1 ][ pathI ] +
+                                   distances[ pathJminus1 ][ pathJ ] +
+                                   distances[ pathKminus1 ][ pathK ] - eps; // subtract a little something to avoid numerical errors
+    vector< double > newDistances( 4 );
+    newDistances[ 0 ] = distances[ pathI ][ pathJ ] + distances[ pathK ][ pathJminus1 ] + distances[ pathIminus1 ][ pathKminus1 ];
+    newDistances[ 1 ] = distances[ pathJ ][ pathK ] + distances[ pathI ][ pathKminus1 ] + distances[ pathJminus1 ][ pathIminus1 ];
+    newDistances[ 2 ] = distances[ pathK ][ pathI ] + distances[ pathJ ][ pathIminus1 ] + distances[ pathKminus1 ][ pathJminus1 ];
+    newDistances[ 3 ] = distances[ pathI ][ pathKminus1 ] + distances[ pathJ ][ pathIminus1 ] + distances[ pathK ][ pathJminus1 ];
+    size_t minIndex = min_element( newDistances.begin(), newDistances.end() ) - newDistances.begin();
+    return removedDistance - newDistances[ minIndex ];
+  }
+
   void compute3OptPath_( vector< size_t >& path,
                          const vector< vector< double > >& distances )
   {
@@ -443,6 +476,34 @@ namespace {
                          const vector< vector< double > >& distances,
                          const vector< vector< size_t > >& nearestNeighbors )
   {
+    bool changed = true;
+    while ( changed ) {
+      changed = false;
+      for ( size_t i = 0; i < path.size(); ++i ) {
+        for ( vector< size_t >::const_iterator jIt = nearestNeighbors[ i ].begin(); jIt != nearestNeighbors[ i ].end(); ++jIt ) {
+          size_t indexOfIInPath = find( path.begin(), path.end(), i ) - path.begin();
+          size_t indexOfJInPath = find( path.begin(), path.end(), *jIt ) - path.begin();
+          assert( indexOfJInPath != indexOfIInPath );
+          for ( vector< size_t >::const_iterator kIt = nearestNeighbors[ *jIt ].begin(); kIt != nearestNeighbors[ *jIt ].end(); ++kIt ) {
+            size_t indexOfKInPath = find( path.begin(), path.end(), *kIt ) - path.begin();
+            assert( indexOfKInPath != indexOfJInPath );
+            if ( indexOfKInPath == indexOfIInPath ) {
+              continue;
+            }
+            if ( update3Opt_( indexOfIInPath, indexOfJInPath, indexOfKInPath, path, distances ) ) {
+              changed = true;
+              break;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  void compute3OptPathOld_( vector< size_t >& path,
+                            const vector< vector< double > >& distances,
+                            const vector< vector< size_t > >& nearestNeighbors )
+  {
 restart3opt:
     for ( size_t i = 0; i < path.size(); ++i ) {
       size_t indexOfIInPath = find( path.begin(), path.end(), i ) - path.begin();
@@ -463,6 +524,7 @@ restart3opt:
       }
     }
   }
+
 
   void make2OptMove_( size_t it0, size_t it1, size_t it2, size_t it3, vector< size_t >& path )
   {
@@ -488,7 +550,7 @@ restart3opt:
     const size_t t1 = path[ i ];
     const size_t t2 = path[ j == 0 ? path.size() - 1 : j - 1 ];
     const size_t t3 = path[ j ];
-//    if ( distances[ t1 ][ t3 ] > distances[ t0 ][ t1 ] + eps ) {
+//    if ( distances[ t0 ][ t1 ] < distances[ t1 ][ t3 ] ) {
 //      return false;
 //    }
     if ( distances[ t0 ][ t2 ] + distances[ t1 ][ t3 ] <
@@ -499,7 +561,49 @@ restart3opt:
     return false;
   }
 
+  double getGain_( size_t i,
+                   size_t j,
+                   vector< size_t >& path,
+                   const vector< vector< double > >& distances )
+  {
+    assert( i < j );
+    const double eps = 1e-9;
+    const size_t t0 = path[ i == 0 ? path.size() - 1 : i - 1 ];
+    const size_t t1 = path[ i ];
+    const size_t t2 = path[ j == 0 ? path.size() - 1 : j - 1 ];
+    const size_t t3 = path[ j ];
+    return ( distances[ t0 ][ t1 ] + distances[ t2 ][ t3 ] - ( distances[ t0 ][ t2 ] + distances[ t1 ][ t3 ] ) ) - eps;
+  }
+
   void compute2OptPath_( vector< size_t >& path,
+                         const vector< vector< double > >& distances )
+  {
+    bool changed = true;
+    while ( changed ) {
+      changed = false;
+      for ( size_t i = 0; i < path.size(); ++i ) {
+        size_t bestI = (size_t)-1;
+        size_t bestJ = (size_t)-1;
+        double bestGain = 0.0;
+        // Cutting the edges of two neighboring nodes does not lead to a new path. Hence start from i + 2.
+        for ( size_t j = i + 2; j < path.size(); ++j ) {
+          double gain = getGain_( i, j, path, distances ) ;
+          if ( gain > bestGain ) {
+            bestI = i;
+            bestJ = j;
+            bestGain = gain;
+            changed = true;
+          }
+        }
+        if ( bestGain > 0.0 ) {
+          reverse( path.begin() + bestI, path.begin() + bestJ );
+        //  assert( update2Opt_( bestI, bestJ, path, distances ) );
+        }
+      }
+    }
+  }
+
+  void compute2OptPath3_( vector< size_t >& path,
                          const vector< vector< double > >& distances )
   {
     bool changed = true;
@@ -517,6 +621,45 @@ restart3opt:
     }
   }
 
+  void compute2OptPath4_( vector< size_t >& path,
+                         const vector< vector< double > >& distances )
+  {
+    double eps = 1e-9;
+    bool changed = true;
+    while ( changed ) {
+      changed = false;
+      for ( size_t t1 = 0; t1 < path.size(); ++t1 ) {
+        for ( size_t j = 0; j < 2; ++j ) {
+          size_t t2 = j == 0 ? ( t1 + path.size() - 1 ) % path.size() : ( t1 + 1 ) % path.size();
+          for ( size_t t3 = 0; t3 < path.size(); ++t3 ) {
+            size_t t4 = j == 0 ? ( t3 + 1 ) % path.size() : ( t3 + path.size() - 1 ) % path.size();
+            if ( t3 == t1 || t4 == t1 || t3 == t2 || t4 == t2 ) {
+              continue;
+            }
+            if ( distances[ t1 ][ t4 ] + distances[ t2 ][ t3 ] < distances[ t1 ][ t2 ] + distances[ t3 ][ t4 ] - eps ) {
+              reverse( path.begin() + max( t1, t2 ), path.begin() + min( t3, t4 ) + 1 );
+              changed = true;
+              break;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  bool contains_( const vector< pair< size_t, size_t > >& xs, const pair< size_t, size_t >& x )
+  {
+    for ( vector< pair< size_t, size_t > >::const_iterator it = xs.begin(); it != xs.end(); ++it ) {
+      if ( it->first == x.first && it->second == x.second ) {
+        return true;
+      }
+      if ( it->second == x.first && it->first == x.second ) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   void computeLinKernighanPath_( vector< size_t >& path,
                                  const vector< vector< double > >& distances )
   {
@@ -529,10 +672,10 @@ restart3opt:
       changed = false;
 restartLinKernighan:
       // Step 2. Let ind = 0. Choose t_0
-      for ( size_t i = 0; i < path.size(); ++i ) {
-        set< pair< size_t, size_t > > T;
+      for ( size_t i = 1; i < path.size(); ++i ) {
+        vector< pair< size_t, size_t > > T;
         for ( size_t j = 0; j < path.size(); ++j ) {
-          T.insert( make_pair( path[ j ], path[ j + 1 % path.size() ] ) );
+          T.push_back( make_pair( path[ j ], path[ ( j + 1 ) % path.size() ] ) );
         }
         size_t ind = 0;
         x.clear();
@@ -547,7 +690,7 @@ restartLinKernighan:
           if ( i < 2 && j + 1 == path.size() ) {
             continue;
           }
-          if ( T.find( make_pair( t[ 1 ], path[ j ] ) ) != T.end() ) {
+          if ( contains_( T, make_pair( t[ 1 ], path[ j ] ) ) ) {
             // y is in T
             continue;
           }
@@ -583,16 +726,31 @@ restartLinKernighan:
               vector< size_t > pathCopy( path );
               assert( t.size() % 2 == 0 );
               assert( x.size() == y.size() );
-              size_t t1 = find( path.begin(), path.end(), x[ 0 ].second ) - path.begin();
               cerr << "Take tour" << endl;
               cerr << "x.size() " << x.size() << endl;
               cerr << "G: " << G << " dist: " << distances[ t.back() ][ t.front() ] << endl;
+              cerr << "path: ";
+              for ( size_t k = 0; k < path.size(); ++k ) {
+                cerr << path[ k ] << " ";
+              }
+              cerr << endl;
+              cerr << "x: ";
+              for ( size_t k = 0; k < x.size(); ++k ) {
+                cerr << "(" << x[ k ].first << ", " << x[ k ].second << "), ";
+              }
+              cerr << endl;
+              cerr << "y: ";
+              for ( size_t k = 0; k < y.size(); ++k ) {
+                cerr << "(" << y[ k ].first << ", " << y[ k ].second << "), ";
+              }
+              cerr << endl;
               for ( size_t k = 1; k < x.size(); ++k ) {
                 size_t t0 = find( path.begin(), path.end(), x[ 0 ].first ) - path.begin();
+                size_t t1 = find( path.begin(), path.end(), x[ k - 1 ].second ) - path.begin();
                 size_t t2 = find( path.begin(), path.end(), x[ k ].first ) - path.begin();
                 size_t t3 = find( path.begin(), path.end(), x[ k ].second ) - path.begin();
+                cerr << "2opt: (" << x[ 0 ].first << ", " << x[ k - 1].second << "), (" << x[ k ].first << ", " << x[ k ].second << ")" << endl;
                 make2OptMove_( t0, t1, t2, t3, path );
-                t1 = find( path.begin(), path.end(), x[ k ].second ) - path.begin();
               }
               assert( path != pathCopy );
 
@@ -615,12 +773,14 @@ step7:
               if ( y.size() == 1 ) {
                 ++maxKForIndEquals2;
               }
-              if ( k == i || k == j ) {
+              if ( k == i || k == j || t.back() == path[ k ] ) {
                 continue;
               }
-              pair< size_t, size_t > yCandidate( t.back(), path[ k ] );
+              pair< size_t, size_t > yCandidate;
+              yCandidate = make_pair( t.back(), path[ k ] );
+
               // y is not in T
-              if ( T.find( yCandidate ) != T.end() ) {
+              if ( contains_( T, yCandidate ) ) {
                 continue;
               }
               // (a) G_i > 0
@@ -629,14 +789,15 @@ step7:
                 continue;
               }
               // (b) y_i != x_s for all s <= i
-              if ( find( x.begin(), x.end(), yCandidate ) == x.end() ) {
+              if ( contains_( x, yCandidate ) ) {
                 continue;
               }
               // (c) x_(i+1) exists
               size_t tNextCandidate = path[ ( ( find( path.begin(), path.end(), path[ k ] ) - path.begin() ) + path.size() - 1 ) % path.size() ]; // element in path previous to t_(2i+2) candidate
-              pair< size_t, size_t > xCandidate( path[ k ], tNextCandidate );
-              nextXExists = find( x.begin(), x.end(), xCandidate ) == x.end() &&
-                            find( y.begin(), y.end(), xCandidate ) == y.end() &&
+              pair< size_t, size_t > xCandidate;
+              xCandidate = make_pair( path[ k ], tNextCandidate );
+              nextXExists = !contains_( x, xCandidate ) &&
+                            !contains_( y, xCandidate ) &&
                             tNextCandidate != t.back();
               if ( !nextXExists ) {
                 continue;
