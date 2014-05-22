@@ -29,7 +29,6 @@ double computeDistance( const vector< double >& point1, const vector< double >& 
 
 void testTSP( size_t numOfPoints )
 {
-  srand( clock() );
   vector< vector< double > > points( numOfPoints, vector< double >( 2 ) );
   for ( size_t i = 0; i < numOfPoints; ++i ) {
     points[ i ][ 0 ] = double( rand() ) / RAND_MAX;
