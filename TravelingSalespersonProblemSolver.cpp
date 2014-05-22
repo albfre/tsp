@@ -47,29 +47,29 @@ namespace {
 
   void reverse( vector< size_t >& path, const size_t i, const size_t j )
   {
-    if ( j - i < path.size() - j + i ) {
+    assert( i < j );
+    if ( j - i < path.size() + i - j ) {
       reverse( path.begin() + i, path.begin() + j );
     }
     else {
       size_t nnn = 0;
-      vector< size_t >::iterator iIt = path.begin() + i + 1;
+      vector< size_t >::reverse_iterator iIt = path.rbegin() + i;
       vector< size_t >::iterator jIt = path.begin() + j;
-      for ( ; iIt != path.begin() && jIt != path.end(); ++jIt ) {
-        --iIt;
+      for ( ; iIt != path.rend() && jIt != path.end(); ++iIt, ++jIt ) {
         swap( *iIt, *jIt );
         ++nnn;
       }
       if ( jIt == path.end() ) {
         jIt = path.begin();
       }
-      else if ( iIt == path.begin() ) {
-        iIt = path.end() - 1;
+      if ( iIt == path.rend() ) {
+        iIt = path.rbegin();
       }
-      for ( ; iIt > jIt; --iIt, ++jIt ) {
+      for ( ; nnn < path.size() + i - j; ++iIt, ++jIt ) {
         swap( *iIt, *jIt );
         ++nnn;
       }
-      if ( fabs( int(nnn) - int( path.size() - j + i ) / 2 ) > 2 ) {
+      if ( fabs( int(nnn) - int( path.size() - j + i ) ) > 2 ) {
         cerr << "n: " << nnn << " path.size() " << path.size() << " i: " << i << ", j: " << j << ", " <<  int( path.size() - j + i ) / 2  << endl;
         assert( false );
       }
@@ -461,17 +461,6 @@ namespace {
     }
   }
 
-  bool neighbors_( size_t i, size_t j, const vector< size_t > path )
-  {
-    if ( i < j ) {
-      swap( i, j );
-    }
-    if ( i + 1 == path.size() && j == 0 ) {
-      return true;
-    }
-    return j + 1 == i;
-  }
-
   void compute3OptPath_( vector< size_t >& path,
                          const vector< vector< double > >& distances,
                          const vector< vector< size_t > >& nearestNeighbors )
@@ -549,7 +538,7 @@ restart3opt:
     const size_t t0 = path[ i == 0 ? path.size() - 1 : i - 1 ];
     const size_t t1 = path[ i ];
     const size_t t2 = path[ j == 0 ? path.size() - 1 : j - 1 ];
-    const size_t t3 = path[ j ];
+    const size_t t3 = path[ j % path.size() ];
 //    if ( distances[ t0 ][ t1 ] < distances[ t1 ][ t3 ] ) {
 //      return false;
 //    }
@@ -571,7 +560,7 @@ restart3opt:
     const size_t t0 = path[ i == 0 ? path.size() - 1 : i - 1 ];
     const size_t t1 = path[ i ];
     const size_t t2 = path[ j == 0 ? path.size() - 1 : j - 1 ];
-    const size_t t3 = path[ j ];
+    const size_t t3 = path[ j % path.size() ];
     return ( distances[ t0 ][ t1 ] + distances[ t2 ][ t3 ] - ( distances[ t0 ][ t2 ] + distances[ t1 ][ t3 ] ) ) - eps;
   }
 
@@ -596,14 +585,16 @@ restart3opt:
           }
         }
         if ( bestGain > 0.0 ) {
-          reverse( path.begin() + bestI, path.begin() + bestJ );
-        //  assert( update2Opt_( bestI, bestJ, path, distances ) );
+          reverse( path, bestI, bestJ );
+//          reverse( path.begin() + bestI, path.begin() + bestJ );
+          break;
         }
       }
     }
+    assertIsPath_( path, distances );
   }
 
-  void compute2OptPath3_( vector< size_t >& path,
+  void compute2OptPathOld_( vector< size_t >& path,
                          const vector< vector< double > >& distances )
   {
     bool changed = true;
@@ -615,32 +606,6 @@ restart3opt:
           if ( update2Opt_( i, j, path, distances ) ) {
             changed = true;
             break;
-          }
-        }
-      }
-    }
-  }
-
-  void compute2OptPath4_( vector< size_t >& path,
-                         const vector< vector< double > >& distances )
-  {
-    double eps = 1e-9;
-    bool changed = true;
-    while ( changed ) {
-      changed = false;
-      for ( size_t t1 = 0; t1 < path.size(); ++t1 ) {
-        for ( size_t j = 0; j < 2; ++j ) {
-          size_t t2 = j == 0 ? ( t1 + path.size() - 1 ) % path.size() : ( t1 + 1 ) % path.size();
-          for ( size_t t3 = 0; t3 < path.size(); ++t3 ) {
-            size_t t4 = j == 0 ? ( t3 + 1 ) % path.size() : ( t3 + path.size() - 1 ) % path.size();
-            if ( t3 == t1 || t4 == t1 || t3 == t2 || t4 == t2 ) {
-              continue;
-            }
-            if ( distances[ t1 ][ t4 ] + distances[ t2 ][ t3 ] < distances[ t1 ][ t2 ] + distances[ t3 ][ t4 ] - eps ) {
-              reverse( path.begin() + max( t1, t2 ), path.begin() + min( t3, t4 ) + 1 );
-              changed = true;
-              break;
-            }
           }
         }
       }
