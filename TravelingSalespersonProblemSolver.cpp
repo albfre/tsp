@@ -105,30 +105,6 @@ namespace {
     return path;
   }
 
-/*
-  vector< size_t > getGreedyPath_( const vector< vector< double > >& distances )
-  {
-    vector< size_t > path;
-    path.reserve( distances.size() );
-    vector< pair< double, pair< size_t, size_t > > > edges;
-    edges.reserve( distances.size() * ( distances.size() - 1 ) / 2 );
-    for ( size_t i = 0; i < distances.size(); ++i ) {
-      for ( size_t j = i + 1; j < distances[ i ].size(); ++j ) {
-        edges.push_back( make_pair( distances[ i ][ j ], make_pair( i, j ) ) );
-      }
-    }
-    vector< pair< size_t, size_t > > addedEdges;
-    sort( edges.rbegin(), edges.rend() ); // rbegin-rend => sort ascending
-    while ( path.size() < distances.size() ) {
-      pair< size_t, size_t > nodes
-
-    }
-
-    assertIsPath_( path, distances );
-    return path;
-  }
-  */
-
   vector< vector< size_t > > computeNearestNeighbors_( const vector< vector< double > >& distances,
                                                        size_t numberOfNeighbors )
   {
@@ -164,12 +140,76 @@ namespace {
       vector< size_t > children_;
   };
 
+  vector< size_t > getGreedyPath_( const vector< vector< double > >& distances )
+  {
+    // The greedy heuristic of matroid theory
+    vector< size_t > degree( distances.size() );
+
+    vector< size_t > fragmentIndices( distances.size() );
+    vector< vector< size_t > > fragments( distances.size() );
+    for ( size_t i = 0; i < distances.size(); ++i ) {
+      fragments[ i ] = vector< size_t >( 1, i );
+      fragmentIndices[ i ] = i;
+    }
+    vector< pair< double, pair< size_t, size_t > > > edges;
+    edges.reserve( distances.size() * ( distances.size() - 1 ) / 2 );
+    for ( size_t i = 0; i < distances.size(); ++i ) {
+      for ( size_t j = i + 1; j < distances[ i ].size(); ++j ) {
+        edges.push_back( make_pair( distances[ i ][ j ], make_pair( i, j ) ) );
+      }
+    }
+    vector< pair< size_t, size_t > > addedEdges;
+    sort( edges.rbegin(), edges.rend() ); // rbegin-rend => smallest element last
+    while ( edges.size() > 0 ) {
+      pair< size_t, size_t > edgeNodes = edges.back().second;
+      edges.pop_back();
+      size_t v1 = edgeNodes.first;
+      size_t v2 = edgeNodes.second;
+      if ( degree[ v1 ] < 2 && degree[ v2 ] < 2 && fragmentIndices[ v1 ] != fragmentIndices[ v2 ] ) {
+        assert( fragmentIndices[ v1 ] != (size_t)-1 );
+        assert( fragmentIndices[ v2 ] != (size_t)-1 );
+        vector< size_t >& f1 = fragments[ fragmentIndices[ v1 ] ];
+        vector< size_t >& f2 = fragments[ fragmentIndices[ v2 ] ];
+        assert( f1.front() == v1 || f1.back() == v1 );
+
+        assert( f2.front() == v2 || f2.back() == v2 );
+        if ( f1.front() == v1 ) {
+          reverse( f1.begin(), f1.end() );
+        }
+        if ( f2.back() == v2 ) {
+          reverse( f2.begin(), f2.end() );
+        }
+        f1.insert( f1.end(), f2.begin(), f2.end() );
+        fragmentIndices[ f2.back() ] = fragmentIndices[ v1 ];
+
+        if ( degree[ v1 ] > 0 ) {
+          fragmentIndices[ v1 ] = (size_t)-1;
+        }
+        if ( degree[ v2 ] > 0 ) {
+          fragmentIndices[ v2 ] = (size_t)-1;
+        }
+        f2.clear();
+        ++degree[ v1 ];
+        ++degree[ v2 ];
+      }
+    }
+    vector< size_t > path;
+    for ( size_t i = 0; i < fragments.size(); ++i ) {
+      if ( fragments[ i ].size() > 0 ) {
+        path.swap( fragments[ i ] );
+        break;
+      }
+    }
+
+    assertIsPath_( path, distances );
+    return path;
+  }
+
   double get1Tree_( vector< Vertex >& nodes,
                     const vector< vector< double > >& distances,
                     const vector< double >& lagrangeMultipliers )
   {
     // 1. Compute minimum spanning tree of the vertices excluding the first, using Prim's algorithm
-    nodes.clear();
     for ( size_t i = 0; i < distances.size(); ++i ) {
       nodes.push_back( Vertex( i ) );
     }
@@ -636,11 +676,13 @@ namespace TravelingSalespersonProblemSolver {
     }
     vector< size_t > pathRand = getRandomPath_( distances );
     vector< size_t > pathNN = getNearestNeighborPath_( distances );
-    vector< size_t > path( pathNN );
+    vector< size_t > pathGreedy = getGreedyPath_( distances );
+    vector< size_t > path( pathGreedy );
     vector< vector< size_t > > nearestNeighbors = computeNearestNeighbors_( distances, 10 );
 
     cerr << "Initial distance: " << getLength_( path, distances ) << endl;
     cerr << "Nearest neighbor distance: " << getLength_( pathNN, distances ) << endl;
+    cerr << "Greedy distance: " << getLength_( pathGreedy, distances ) << endl;
     if ( true ) {
       cerr << "1-tree distance: ";
       double start( clock() );
