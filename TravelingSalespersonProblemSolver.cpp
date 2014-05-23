@@ -209,6 +209,10 @@ namespace {
     vertexDegrees.assign( distances.size(), 0 );
 
     // 1. Compute length of the minimum spanning tree excluding one vertex, using Prim's algorithm.
+
+    // Select the vertex with minimum maximal distances to a neighbor in
+    // order to allow for problems with artificial nodes (such as those used
+    // to construct Hamiltonian paths) with epsilon distance to all neighbors.
     size_t minimaxVertex = 0;
     double minimaxValue = *max_element( distances[ 0 ].begin(), distances[ 0 ].end() );
     for ( size_t i = 1; i < distances.size(); ++i ) {
@@ -533,6 +537,114 @@ namespace {
     }
   }
 
+  bool update4Opt_( size_t i,
+                    size_t j,
+                    size_t k,
+                    size_t l,
+                    vector< size_t >& path,
+                    const vector< vector< double > >& distances )
+  {
+    vector< size_t > vertices( 4 );
+    vertices[ 0 ] = i; vertices[ 1 ] = j; vertices[ 2 ] = k; vertices[ 3 ] = l;
+    sort( vertices.begin(), vertices.end() );
+    i = vertices[ 0 ]; j = vertices[ 1 ]; k = vertices[ 2 ]; l = vertices[ 3 ];
+    assert( i < j && j < k );
+    const size_t pathI = path[ i ];
+    const size_t iMinus1 = ( i + path.size() - 1 ) % path.size();
+    const size_t pathIminus1 = path[ iMinus1 ];
+    const size_t pathJ = path[ j ];
+    const size_t jMinus1 = ( j + path.size() - 1 ) % path.size();
+    const size_t pathJminus1 = path[ jMinus1 ];
+    const size_t pathK = path[ k ];
+    const size_t kMinus1 = ( k + path.size() - 1 ) % path.size();
+    const size_t pathKminus1 = path[ kMinus1 ];
+    const size_t pathL = path[ l ];
+    const size_t lMinus1 = ( l + path.size() - 1 ) % path.size();
+    const size_t pathLminus1 = path[ lMinus1 ];
+    const double eps = 1e-9;
+    const double removedDistance = distances[ pathIminus1 ][ pathI ] +
+                                   distances[ pathJminus1 ][ pathJ ] +
+                                   distances[ pathKminus1 ][ pathK ] +
+                                   distances[ pathLminus1 ][ pathL ] - eps; // subtract a little something to avoid numerical errors
+    double newDistance = distances[ pathI ][ pathKminus1 ] + distances[ pathJ ][ pathLminus1 ] + distances[ pathK ][ pathIminus1 ] + distances[ pathL ][ pathJminus1 ];
+    if ( newDistance < removedDistance ) {
+      vector< size_t > pathCopy( path );
+      // {i, j-1}
+      copy( pathCopy.begin() + i, pathCopy.begin() + j, path.begin() );
+      size_t pathIndex = j - i;
+
+      // {l, i-1}
+      for ( size_t ind = l; ind < i + path.size(); ++ind, ++pathIndex ) {
+        path[ pathIndex ] = pathCopy[ ind % path.size() ];
+      }
+
+      // {k, l-1}
+      copy( pathCopy.begin() + k, pathCopy.begin() + l, path.begin() + pathIndex );
+      pathIndex += l - k;
+
+      // {j, k-1}
+      copy( pathCopy.begin() + j, pathCopy.begin() + k, path.begin() + pathIndex );
+      pathIndex += k - j;
+      if ( pathIndex != path.size() ) {
+        cerr << "i: " << i << ", j: " << j << ", k: " << k << ", l: " << l << ", pathIndex: " << pathIndex << ", path.size(): " << path.size() << endl;
+      }
+
+      assert( pathIndex == path.size() );
+      return true;
+    }
+    return false;
+  }
+
+  void compute4OptPath_( vector< size_t >& path,
+                         const vector< vector< double > >& distances,
+                         const vector< vector< size_t > >& nearestNeighbors )
+  {
+    vector< size_t > position( path.size() );
+    for ( size_t i = 0; i < path.size(); ++i ) {
+      position[ path[ i ] ] = i;
+    }
+    bool changed = true;
+    size_t maxNeighbors = 10;
+    while ( changed ) {
+      changed = false;
+      for ( size_t i = 0; i < path.size(); ++i ) {
+        for ( vector< size_t >::const_iterator jIt = nearestNeighbors[ i ].begin(); jIt != nearestNeighbors[ i ].end(); ++jIt ) {
+          if ( jIt - nearestNeighbors[ i ].begin() > int( maxNeighbors ) ) {
+            break;
+          }
+          for ( vector< size_t >::const_iterator kIt = nearestNeighbors[ *jIt ].begin(); kIt != nearestNeighbors[ *jIt ].end(); ++kIt ) {
+            if ( kIt - nearestNeighbors[ *jIt ].begin() > int( maxNeighbors ) ) {
+              break;
+            }
+            for ( vector< size_t >::const_iterator lIt = nearestNeighbors[ *kIt ].begin(); lIt != nearestNeighbors[ *kIt ].end(); ++lIt ) {
+              if ( lIt - nearestNeighbors[ *kIt ].begin() > int( maxNeighbors ) ) {
+                break;
+              }
+              size_t indexOfIInPath = position[ i ];
+              size_t indexOfJInPath = position[ *jIt ];
+              size_t indexOfKInPath = position[ *kIt ];
+              size_t indexOfLInPath = position[ *lIt ];
+              assert( indexOfJInPath != indexOfIInPath );
+              assert( indexOfKInPath != indexOfJInPath );
+              assert( indexOfLInPath != indexOfKInPath );
+              if ( indexOfKInPath == indexOfIInPath || indexOfLInPath == indexOfIInPath || indexOfLInPath == indexOfJInPath ) {
+                continue;
+              }
+              if ( update4Opt_( indexOfIInPath, indexOfJInPath, indexOfKInPath, indexOfLInPath, path, distances ) ) {
+                changed = true;
+                for ( size_t i = 0; i < path.size(); ++i ) {
+                  position[ path[ i ] ] = i;
+                }
+                break;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+
   bool update2Opt_( size_t i,
                     size_t j,
                     vector< size_t >& path,
@@ -841,8 +953,9 @@ namespace TravelingSalespersonProblemSolver {
     if ( true ) {
       double start( clock() );
 //      computeLinKernighanPath_( path, distances );
+      compute4OptPath_( path, distances, nearestNeighbors );
       double time( ( clock() - start ) / CLOCKS_PER_SEC );
-      cerr << "LK-opt path distance: " << getLength_( path, distances ) << ", time: " << time << endl;
+      cerr << "4-opt path distance: " << getLength_( path, distances ) << ", time: " << time << endl;
       assertIsPath_( path, distances );
     }
 

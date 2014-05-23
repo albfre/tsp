@@ -38,7 +38,7 @@ void testTSPRegular( size_t numOfPoints )
       points.back()[ 1 ] = sqrt( 0.2 * 0.2 - 0.1 * 0.1 ) * i;
     }
   }
-  for ( size_t i = 0; i < numOfPoints / 10; ++i ) {
+  for ( size_t i = 0; i < numOfPoints / 2; ++i ) {
     size_t ind = rand() % points.size();
     points.erase( points.begin() + ind );
   }
