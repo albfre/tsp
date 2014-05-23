@@ -569,27 +569,12 @@ namespace {
     double newDistance = distances[ pathI ][ pathKminus1 ] + distances[ pathJ ][ pathLminus1 ] + distances[ pathK ][ pathIminus1 ] + distances[ pathL ][ pathJminus1 ];
     if ( newDistance < removedDistance ) {
       vector< size_t > pathCopy( path );
-      // {i, j-1}
-      copy( pathCopy.begin() + i, pathCopy.begin() + j, path.begin() );
-      size_t pathIndex = j - i;
-
-      // {l, i-1}
-      for ( size_t ind = l; ind < i + path.size(); ++ind, ++pathIndex ) {
-        path[ pathIndex ] = pathCopy[ ind % path.size() ];
-      }
-
-      // {k, l-1}
+      size_t pathIndex = i;
       copy( pathCopy.begin() + k, pathCopy.begin() + l, path.begin() + pathIndex );
       pathIndex += l - k;
-
-      // {j, k-1}
       copy( pathCopy.begin() + j, pathCopy.begin() + k, path.begin() + pathIndex );
       pathIndex += k - j;
-      if ( pathIndex != path.size() ) {
-        cerr << "i: " << i << ", j: " << j << ", k: " << k << ", l: " << l << ", pathIndex: " << pathIndex << ", path.size(): " << path.size() << endl;
-      }
-
-      assert( pathIndex == path.size() );
+      copy( pathCopy.begin() + i, pathCopy.begin() + j, path.begin() + pathIndex );
       return true;
     }
     return false;
@@ -954,6 +939,8 @@ namespace TravelingSalespersonProblemSolver {
       double start( clock() );
 //      computeLinKernighanPath_( path, distances );
       compute4OptPath_( path, distances, nearestNeighbors );
+      compute2OptPath_( path, distances );
+      compute3OptPath_( path, distances, nearestNeighbors );
       double time( ( clock() - start ) / CLOCKS_PER_SEC );
       cerr << "4-opt path distance: " << getLength_( path, distances ) << ", time: " << time << endl;
       assertIsPath_( path, distances );
