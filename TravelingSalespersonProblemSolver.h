@@ -5,7 +5,7 @@
 #include <vector>
 
 namespace TravelingSalespersonProblemSolver {
-  std::vector< size_t > computePath( const std::vector< std::vector< double > >& distances );
+  std::vector< size_t > computeTour( const std::vector< std::vector< double > >& distances );
 }
 
 #endif

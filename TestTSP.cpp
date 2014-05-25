@@ -59,7 +59,7 @@ void testTSPRegular( size_t numOfPoints )
 
   cout << "Running test on regular instance with " << numOfPoints << " points." << endl;
   double start( clock() );
-  vector< size_t > path = computePath( distances );
+  vector< size_t > path = computeTour( distances );
   size_t ii = find( path.begin(), path.end(), numOfPoints ) - path.begin();
   cerr << "First point: " << path[ ( ii + 1 ) % path.size() ] << endl;
   cout << "CPU seconds to run test: " << setprecision( 4 ) << ( clock() - start ) / CLOCKS_PER_SEC << endl;;
@@ -83,7 +83,7 @@ void testTSPRandom( size_t numOfPoints )
 
   cout << "Running test on random instance with " << numOfPoints << " points." << endl;
   double start( clock() );
-  vector< size_t > path = computePath( distances );
+  vector< size_t > path = computeTour( distances );
   cout << "CPU seconds to run test: " << setprecision( 4 ) << ( clock() - start ) / CLOCKS_PER_SEC << endl;;
 }
 

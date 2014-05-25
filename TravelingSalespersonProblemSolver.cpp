@@ -16,86 +16,86 @@
 using namespace std;
 
 namespace {
-  void assertIsPath_( const vector< size_t >& path,
+  void assertIsTour_( const vector< size_t >& tour,
                       const vector< vector< double > >& distances )
   {
-    assert( path.size() == distances.size() );
-    vector< size_t > pathCopy( path );
-    sort( pathCopy.begin(), pathCopy.end() );
-    for ( size_t i = 0; i < pathCopy.size(); ++i ) {
-      if ( pathCopy[ i ] != i ) {
-        cerr << "sort( pathCopy )[ i ]: " << pathCopy[ i ] << ", i: " << i << endl;
+    assert( tour.size() == distances.size() );
+    vector< size_t > tourCopy( tour );
+    sort( tourCopy.begin(), tourCopy.end() );
+    for ( size_t i = 0; i < tourCopy.size(); ++i ) {
+      if ( tourCopy[ i ] != i ) {
+        cerr << "sort( tourCopy )[ i ]: " << tourCopy[ i ] << ", i: " << i << endl;
       }
-      assert( pathCopy[ i ] == i );
+      assert( tourCopy[ i ] == i );
     }
   }
 
-  vector< size_t > getRandomPath_( const vector< vector< double > >& distances )
+  vector< size_t > getRandomtour_( const vector< vector< double > >& distances )
   {
-    vector< size_t > path( distances.size() );
+    vector< size_t > tour( distances.size() );
     for ( size_t i = 0; i < distances.size(); ++i ) {
-      path[ i ] = i;
+      tour[ i ] = i;
     }
 
     for ( size_t i = 0; i < distances.size(); ++i ) {
       size_t ind1 = rand() % distances.size();
       size_t ind2 = rand() % distances.size();
-      swap( path[ ind1 ], path[ ind2 ] );
+      swap( tour[ ind1 ], tour[ ind2 ] );
     }
-    return path;
+    return tour;
   }
 
   /*
-  void crossingReverse( vector< size_t >& path, const size_t i, const size_t j )
+  void crossingReverse( vector< size_t >& tour, const size_t i, const size_t j )
   {
     assert( i > j );
-    vector< size_t >::iterator iIt = path.begin() + i;
-    vector< size_t >::iterator jIt = path.begin() + j;
-    while ( iIt != path.end() && jIt != path.begin() ) {
+    vector< size_t >::iterator iIt = tour.begin() + i;
+    vector< size_t >::iterator jIt = tour.begin() + j;
+    while ( iIt != tour.end() && jIt != tour.begin() ) {
       --jIt;
       iter_swap( iIt, jIt );
       ++iIt;
     }
-    if ( iIt == path.end() ) {
-      reverse( path.begin(), jIt );
+    if ( iIt == tour.end() ) {
+      reverse( tour.begin(), jIt );
     }
     else {
-      reverse( iIt, path.end() );
+      reverse( iIt, tour.end() );
     }
   }
 
-  void reverseShortest( vector< size_t >& path, const size_t i, const size_t j )
+  void reverseShortest( vector< size_t >& tour, const size_t i, const size_t j )
   {
-    if ( j - i < path.size() + i - j ) {
-      reverse( path.begin() + i, path.begin() + j );
+    if ( j - i < tour.size() + i - j ) {
+      reverse( tour.begin() + i, tour.begin() + j );
     }
     else {
-      vector< size_t >::iterator iIt = path.begin() + i + 1;
-      vector< size_t >::iterator jIt = path.begin() + j;
-      while ( iIt-- != path.begin() && jIt != path.end() ) {
+      vector< size_t >::iterator iIt = tour.begin() + i + 1;
+      vector< size_t >::iterator jIt = tour.begin() + j;
+      while ( iIt-- != tour.begin() && jIt != tour.end() ) {
         iter_swap( iIt, jIt );
         ++jIt;
       }
-      if ( jIt == path.end() ) {
-        reverse( path.begin(), iIt );
+      if ( jIt == tour.end() ) {
+        reverse( tour.begin(), iIt );
       }
       else {
-        reverse( jIt, path.end() );
+        reverse( jIt, tour.end() );
       }
     }
   }
   */
 
-  vector< size_t > getNearestNeighborPath_( const vector< vector< double > >& distances )
+  vector< size_t > getNearestNeighbortour_( const vector< vector< double > >& distances )
   {
-    vector< size_t > path;
-    path.reserve( distances.size() );
+    vector< size_t > tour;
+    tour.reserve( distances.size() );
     size_t startNode = 0; //rand() % distances.size();
-    path.push_back( startNode );
+    tour.push_back( startNode );
     set< size_t > usedNodes;
     usedNodes.insert( startNode );
-    while ( path.size() < distances.size() ) {
-      size_t currentNode = path.back();
+    while ( tour.size() < distances.size() ) {
+      size_t currentNode = tour.back();
       size_t minUnusedIndex = (size_t)-1;
       double minUnusedDistance = numeric_limits< double >::max();
       for ( size_t i = 0; i < distances.size(); ++i ) {
@@ -108,14 +108,14 @@ namespace {
         }
       }
       assert( minUnusedIndex != (size_t)-1 );
-      path.push_back( minUnusedIndex );
+      tour.push_back( minUnusedIndex );
       usedNodes.insert( minUnusedIndex );
     }
-    assertIsPath_( path, distances );
-    return path;
+    assertIsTour_( tour, distances );
+    return tour;
   }
 
-  vector< size_t > getGreedyPath_( const vector< vector< double > >& distances )
+  vector< size_t > getGreedyTour_( const vector< vector< double > >& distances )
   {
     // The greedy heuristic of matroid theory adds the shortest edge that neither
     // makes the degree of a vertex greater than 2 nor creates a cycle shorter than N.
@@ -168,16 +168,16 @@ namespace {
         }
       }
     }
-    vector< size_t > path;
+    vector< size_t > tour;
     for ( size_t i = 0; i < fragments.size(); ++i ) {
       if ( fragments[ i ].size() > 0 ) {
-        path.swap( fragments[ i ] );
+        tour.swap( fragments[ i ] );
         break;
       }
     }
 
-    assertIsPath_( path, distances );
-    return path;
+    assertIsTour_( tour, distances );
+    return tour;
   }
 
   vector< vector< size_t > > computeNearestNeighbors_( const vector< vector< double > >& distances,
@@ -212,7 +212,7 @@ namespace {
 
     // Select the vertex with minimum maximal distances to a neighbor in
     // order to allow for problems with artificial nodes (such as those used
-    // to construct Hamiltonian paths) with epsilon distance to all neighbors.
+    // to construct Hamiltonian tours) with epsilon distance to all neighbors.
     size_t minimaxVertex = 0;
     double minimaxValue = *max_element( distances[ 0 ].begin(), distances[ 0 ].end() );
     for ( size_t i = 1; i < distances.size(); ++i ) {
@@ -238,9 +238,8 @@ namespace {
     // For each unused vertex i, closestTreeNode[ i ] points to the vertex in the tree which is closest to i.
     vector< size_t > closestTreeNode( distances.size(), rootVertex );
 
-
     double treeLength = 0.0;
-    for ( size_t i = 0; i + 2 < distances.size(); ++i ) {
+    while ( unusedVertices.size() > 0 ) {
       size_t fromIndex = 0;
       vector< size_t >::iterator minIt = unusedVertices.begin();
       double minDistance = numeric_limits< double >::max();
@@ -273,8 +272,8 @@ namespace {
     // 2. Add the two shortest edges connecting to the first vertex
     double minElement = numeric_limits< double >::max();
     double secondMinElement = numeric_limits< double >::max();
-    for ( size_t i = 0; i < distances[ 0 ].size(); ++i ) {
-      double value = distances[ 0 ][ i ] + lagrangeMultipliers[ 0 ] + lagrangeMultipliers[ i ];
+    for ( size_t i = 0; i < distances[ minimaxVertex ].size(); ++i ) {
+      double value = distances[ minimaxVertex ][ i ] + lagrangeMultipliers[ minimaxVertex ] + lagrangeMultipliers[ i ];
       if ( value < secondMinElement ) {
         secondMinElement = value;
         if ( value < minElement ) {
@@ -283,7 +282,7 @@ namespace {
         }
       }
     }
-    vertexDegrees[ 0 ] = 2;
+    vertexDegrees[ minimaxVertex ] = 2;
 
     treeLength += minElement + secondMinElement;
     return treeLength - 2.0 * accumulate( lagrangeMultipliers.begin(), lagrangeMultipliers.end(), 0.0 );
@@ -304,6 +303,9 @@ namespace {
         double d = double( vertexDegrees[ j ] ) - 2.0;
         denominator += d * d;
       }
+      if ( denominator == 0.0 ) {
+        return bestLength;
+      }
       double t = 2.0 * lambda * treeLength / denominator;
 
       for ( size_t j = 0; j < lagrangeMultipliers.size(); ++j ) {
@@ -315,24 +317,24 @@ namespace {
     return bestLength;
   }
 
-  double getLength_( vector< size_t > path,
+  double getLength_( vector< size_t > tour,
                      const vector< vector< double > >& distances )
   {
-    double distance = distances[ path.back() ][ path.front() ];
-    for ( size_t i = 0; i + 1 < path.size(); ++i ) {
-      distance += distances[ path[ i ] ][ path[ i + 1 ] ];
+    double distance = distances[ tour.back() ][ tour.front() ];
+    for ( size_t i = 0; i + 1 < tour.size(); ++i ) {
+      distance += distances[ tour[ i ] ][ tour[ i + 1 ] ];
     }
     return distance;
   }
 
-  void update3OptIntervals_( vector< size_t >& path,
+  void update3OptIntervals_( vector< size_t >& tour,
                              size_t i1Begin, size_t i1End, bool reverseI1,
                              size_t i2Begin, size_t i2End, bool reverseI2,
                              size_t i3Begin, size_t i3End, bool reverseI3,
                              const vector< vector< double > >& distances )
   {
-    vector< size_t > pathCopy( path );
-    size_t pathIdx = 0;
+    vector< size_t > tourCopy( tour );
+    size_t tourIdx = 0;
     for ( size_t i = 0; i < 3; ++i ) {
       size_t iBegin, iEnd;
       bool reverse;
@@ -344,67 +346,68 @@ namespace {
       }
       if ( reverse ) {
         if ( iBegin < iEnd ) {
-          iBegin += path.size();
+          iBegin += tour.size();
         }
-        for ( size_t idx = iBegin; idx > iEnd; --idx, ++pathIdx ) {
-          path[ pathIdx ] = pathCopy[ idx % path.size() ];
+        for ( size_t idx = iBegin; idx > iEnd; --idx, ++tourIdx ) {
+          tour[ tourIdx ] = tourCopy[ idx % tour.size() ];
         }
       }
       else {
         if ( iEnd < iBegin ) {
-          iEnd += path.size();
+          iEnd += tour.size();
         }
-        for ( size_t idx = iBegin; idx < iEnd; ++idx, ++pathIdx ) {
-          path[ pathIdx ] = pathCopy[ idx % path.size() ];
+        for ( size_t idx = iBegin; idx < iEnd; ++idx, ++tourIdx ) {
+          tour[ tourIdx ] = tourCopy[ idx % tour.size() ];
         }
       }
     }
-    if ( pathIdx != path.size() ) {
-      cerr << pathIdx << " " << path.size() << endl;
+    if ( tourIdx != tour.size() ) {
+      cerr << tourIdx << " " << tour.size() << endl;
     }
-    assert( pathIdx == path.size() );
-    assert( getLength_( path, distances ) < getLength_( pathCopy, distances ) );
+    assert( tourIdx == tour.size() );
+    assert( getLength_( tour, distances ) < getLength_( tourCopy, distances ) );
   }
 
   bool update3Opt_( size_t i,
                     size_t j,
                     size_t k,
-                    vector< size_t >& path,
+                    vector< size_t >& tour,
                     const vector< vector< double > >& distances )
   {
+    // Because all combinations are tried, the order of i, j, and k doesn't matter.
     vector< size_t > vertices( 3 );
     vertices[ 0 ] = i; vertices[ 1 ] = j; vertices[ 2 ] = k;
     sort( vertices.begin(), vertices.end() );
     i = vertices[ 0 ]; j = vertices[ 1 ]; k = vertices[ 2 ];
     assert( i < j && j < k );
-    const size_t pathI = path[ i ];
-    const size_t iMinus1 = ( i + path.size() - 1 ) % path.size();
-    const size_t pathIminus1 = path[ iMinus1 ];
-    const size_t pathJ = path[ j ];
-    const size_t jMinus1 = ( j + path.size() - 1 ) % path.size();
-    const size_t pathJminus1 = path[ jMinus1 ];
-    const size_t pathK = path[ k ];
-    const size_t kMinus1 = ( k + path.size() - 1 ) % path.size();
-    const size_t pathKminus1 = path[ kMinus1 ];
+    const size_t tourI = tour[ i ];
+    const size_t iMinus1 = ( i + tour.size() - 1 ) % tour.size();
+    const size_t tourIminus1 = tour[ iMinus1 ];
+    const size_t tourJ = tour[ j ];
+    const size_t jMinus1 = ( j + tour.size() - 1 ) % tour.size();
+    const size_t tourJminus1 = tour[ jMinus1 ];
+    const size_t tourK = tour[ k ];
+    const size_t kMinus1 = ( k + tour.size() - 1 ) % tour.size();
+    const size_t tourKminus1 = tour[ kMinus1 ];
     const double eps = 1e-9;
-    const double removedDistance = distances[ pathIminus1 ][ pathI ] +
-                                   distances[ pathJminus1 ][ pathJ ] +
-                                   distances[ pathKminus1 ][ pathK ] - eps; // subtract a little something to avoid numerical errors
+    const double removedDistance = distances[ tourIminus1 ][ tourI ] +
+                                   distances[ tourJminus1 ][ tourJ ] +
+                                   distances[ tourKminus1 ][ tourK ] - eps; // subtract a little something to avoid numerical errors
     vector< double > newDistances( 4 );
-    newDistances[ 0 ] = distances[ pathI ][ pathJ ] + distances[ pathK ][ pathJminus1 ] + distances[ pathIminus1 ][ pathKminus1 ];
-    newDistances[ 1 ] = distances[ pathJ ][ pathK ] + distances[ pathI ][ pathKminus1 ] + distances[ pathJminus1 ][ pathIminus1 ];
-    newDistances[ 2 ] = distances[ pathK ][ pathI ] + distances[ pathJ ][ pathIminus1 ] + distances[ pathKminus1 ][ pathJminus1 ];
-    newDistances[ 3 ] = distances[ pathI ][ pathKminus1 ] + distances[ pathJ ][ pathIminus1 ] + distances[ pathK ][ pathJminus1 ];
+    newDistances[ 0 ] = distances[ tourI ][ tourJ ] + distances[ tourK ][ tourJminus1 ] + distances[ tourIminus1 ][ tourKminus1 ];
+    newDistances[ 1 ] = distances[ tourJ ][ tourK ] + distances[ tourI ][ tourKminus1 ] + distances[ tourJminus1 ][ tourIminus1 ];
+    newDistances[ 2 ] = distances[ tourK ][ tourI ] + distances[ tourJ ][ tourIminus1 ] + distances[ tourKminus1 ][ tourJminus1 ];
+    newDistances[ 3 ] = distances[ tourI ][ tourKminus1 ] + distances[ tourJ ][ tourIminus1 ] + distances[ tourK ][ tourJminus1 ];
     size_t minIndex = min_element( newDistances.begin(), newDistances.end() ) - newDistances.begin();
     if ( newDistances[ minIndex ] < removedDistance ) {
       switch ( minIndex ) {
-        case 0: reverse( path.begin() + i, path.begin() + j ); reverse( path.begin() + i, path.begin() + k ); break;
-        case 1: reverse( path.begin() + i, path.begin() + j ); reverse( path.begin() + j, path.begin() + k ); break;
-//        case 2: reverse( path.begin() + i, path.begin() + k ); crossingReverse( path, k, i ); break;
-//        case 0: update3OptIntervals_( path, i, j, false, k, i, false, kMinus1, jMinus1, true, distances ); break;
-//        case 1: update3OptIntervals_( path, i, j, false, iMinus1, kMinus1, true, j, k, false, distances ); break;
-        case 2: update3OptIntervals_( path, i, j, false, kMinus1, jMinus1, true, iMinus1, kMinus1, true, distances ); break;
-        case 3: update3OptIntervals_( path, i, j, false, k, i, false, j, k, false, distances ); break;
+        case 0: reverse( tour.begin() + i, tour.begin() + j ); reverse( tour.begin() + i, tour.begin() + k ); break;
+        case 1: reverse( tour.begin() + i, tour.begin() + j ); reverse( tour.begin() + j, tour.begin() + k ); break;
+//        case 2: reverse( tour.begin() + i, tour.begin() + k ); crossingReverse( tour, k, i ); break;
+//        case 0: update3OptIntervals_( tour, i, j, false, k, i, false, kMinus1, jMinus1, true, distances ); break;
+//        case 1: update3OptIntervals_( tour, i, j, false, iMinus1, kMinus1, true, j, k, false, distances ); break;
+        case 2: update3OptIntervals_( tour, i, j, false, kMinus1, jMinus1, true, iMinus1, kMinus1, true, distances ); break;
+        case 3: update3OptIntervals_( tour, i, j, false, k, i, false, j, k, false, distances ); break;
         default: assert( false );
       }
       return true;
@@ -416,7 +419,7 @@ namespace {
   double getGain_( size_t i,
                    size_t j,
                    size_t k,
-                   vector< size_t >& path,
+                   vector< size_t >& tour,
                    const vector< vector< double > >& distances )
   {
     vector< size_t > vertices( 3 );
@@ -424,40 +427,40 @@ namespace {
     sort( vertices.begin(), vertices.end() );
     i = vertices[ 0 ]; j = vertices[ 1 ]; k = vertices[ 2 ];
     assert( i < j && j < k );
-    const size_t pathI = path[ i ];
-    const size_t iMinus1 = ( i + path.size() - 1 ) % path.size();
-    const size_t pathIminus1 = path[ iMinus1 ];
-    const size_t pathJ = path[ j ];
-    const size_t jMinus1 = ( j + path.size() - 1 ) % path.size();
-    const size_t pathJminus1 = path[ jMinus1 ];
-    const size_t pathK = path[ k ];
-    const size_t kMinus1 = ( k + path.size() - 1 ) % path.size();
-    const size_t pathKminus1 = path[ kMinus1 ];
+    const size_t tourI = tour[ i ];
+    const size_t iMinus1 = ( i + tour.size() - 1 ) % tour.size();
+    const size_t tourIminus1 = tour[ iMinus1 ];
+    const size_t tourJ = tour[ j ];
+    const size_t jMinus1 = ( j + tour.size() - 1 ) % tour.size();
+    const size_t tourJminus1 = tour[ jMinus1 ];
+    const size_t tourK = tour[ k ];
+    const size_t kMinus1 = ( k + tour.size() - 1 ) % tour.size();
+    const size_t tourKminus1 = tour[ kMinus1 ];
     const double eps = 1e-9;
-    const double removedDistance = distances[ pathIminus1 ][ pathI ] +
-                                   distances[ pathJminus1 ][ pathJ ] +
-                                   distances[ pathKminus1 ][ pathK ] - eps; // subtract a little something to avoid numerical errors
+    const double removedDistance = distances[ tourIminus1 ][ tourI ] +
+                                   distances[ tourJminus1 ][ tourJ ] +
+                                   distances[ tourKminus1 ][ tourK ] - eps; // subtract a little something to avoid numerical errors
     vector< double > newDistances( 4 );
-    newDistances[ 0 ] = distances[ pathI ][ pathJ ] + distances[ pathK ][ pathJminus1 ] + distances[ pathIminus1 ][ pathKminus1 ];
-    newDistances[ 1 ] = distances[ pathJ ][ pathK ] + distances[ pathI ][ pathKminus1 ] + distances[ pathJminus1 ][ pathIminus1 ];
-    newDistances[ 2 ] = distances[ pathK ][ pathI ] + distances[ pathJ ][ pathIminus1 ] + distances[ pathKminus1 ][ pathJminus1 ];
-    newDistances[ 3 ] = distances[ pathI ][ pathKminus1 ] + distances[ pathJ ][ pathIminus1 ] + distances[ pathK ][ pathJminus1 ];
+    newDistances[ 0 ] = distances[ tourI ][ tourJ ] + distances[ tourK ][ tourJminus1 ] + distances[ tourIminus1 ][ tourKminus1 ];
+    newDistances[ 1 ] = distances[ tourJ ][ tourK ] + distances[ tourI ][ tourKminus1 ] + distances[ tourJminus1 ][ tourIminus1 ];
+    newDistances[ 2 ] = distances[ tourK ][ tourI ] + distances[ tourJ ][ tourIminus1 ] + distances[ tourKminus1 ][ tourJminus1 ];
+    newDistances[ 3 ] = distances[ tourI ][ tourKminus1 ] + distances[ tourJ ][ tourIminus1 ] + distances[ tourK ][ tourJminus1 ];
     size_t minIndex = min_element( newDistances.begin(), newDistances.end() ) - newDistances.begin();
     return removedDistance - newDistances[ minIndex ];
   }
 
-  void compute3OptPath2_( vector< size_t >& path,
+  void compute3OptTour2_( vector< size_t >& tour,
                          const vector< vector< double > >& distances,
                          const vector< vector< size_t > >& nearestNeighbors )
   {
-    vector< size_t > position( path.size() );
-    for ( size_t i = 0; i < path.size(); ++i ) {
-      position[ path[ i ] ] = i;
+    vector< size_t > position( tour.size() );
+    for ( size_t i = 0; i < tour.size(); ++i ) {
+      position[ tour[ i ] ] = i;
     }
     bool changed = true;
     while ( changed ) {
       changed = false;
-      for ( size_t i = 0; i < path.size(); ++i ) {
+      for ( size_t i = 0; i < tour.size(); ++i ) {
         for ( vector< size_t >::const_iterator jIt = nearestNeighbors[ i ].begin(); jIt != nearestNeighbors[ i ].end(); ++jIt ) {
           size_t bestI = 0;
           size_t bestJ = 0;
@@ -465,24 +468,24 @@ namespace {
           double bestGain = 0.0;
           size_t numGains = 0;
 
-          size_t indexOfIInPath = position[ i ];
-          size_t indexOfJInPath = position[ *jIt ];
-          assert( indexOfJInPath != indexOfIInPath );
+          size_t indexOfIIntour = position[ i ];
+          size_t indexOfJIntour = position[ *jIt ];
+          assert( indexOfJIntour != indexOfIIntour );
           for ( vector< size_t >::const_iterator kIt = nearestNeighbors[ *jIt ].begin(); kIt != nearestNeighbors[ *jIt ].end(); ++kIt ) {
-            size_t indexOfKInPath = position[ *kIt ];
-            assert( indexOfKInPath != indexOfJInPath );
-            if ( indexOfKInPath == indexOfIInPath ) {
+            size_t indexOfKIntour = position[ *kIt ];
+            assert( indexOfKIntour != indexOfJIntour );
+            if ( indexOfKIntour == indexOfIIntour ) {
               continue;
             }
-            double gain = getGain_( indexOfIInPath, indexOfJInPath, indexOfKInPath, path, distances ) ;
+            double gain = getGain_( indexOfIIntour, indexOfJIntour, indexOfKIntour, tour, distances ) ;
             if ( gain > 0 ) {
               ++numGains;
             }
             if ( gain > bestGain ) {
               bestGain = gain;
-              bestI = indexOfIInPath;
-              bestJ = indexOfJInPath;
-              bestK = indexOfKInPath;
+              bestI = indexOfIIntour;
+              bestJ = indexOfJIntour;
+              bestK = indexOfKIntour;
               changed = true;
             }
             if ( numGains >= 8 ) {
@@ -490,9 +493,9 @@ namespace {
             }
           }
           if ( bestGain > 0.0 ) {
-            assert( update3Opt_( bestI, bestJ, bestK, path, distances ) );
-            for ( size_t pi = 0; pi < path.size(); ++pi ) {
-              position[ path[ pi ] ] = pi;
+            assert( update3Opt_( bestI, bestJ, bestK, tour, distances ) );
+            for ( size_t pi = 0; pi < tour.size(); ++pi ) {
+              position[ tour[ pi ] ] = pi;
             }
             break;
           }
@@ -502,32 +505,32 @@ namespace {
   }
   */
 
-  void compute3OptPath_( vector< size_t >& path,
-                         const vector< vector< double > >& distances,
-                         const vector< vector< size_t > >& nearestNeighbors )
+  void compute3OptTourOld_( vector< size_t >& tour,
+                            const vector< vector< double > >& distances,
+                            const vector< vector< size_t > >& nearestNeighbors )
   {
-    vector< size_t > position( path.size() );
-    for ( size_t i = 0; i < path.size(); ++i ) {
-      position[ path[ i ] ] = i;
+    vector< size_t > position( tour.size() );
+    for ( size_t i = 0; i < tour.size(); ++i ) {
+      position[ tour[ i ] ] = i;
     }
     bool changed = true;
     while ( changed ) {
       changed = false;
-      for ( size_t i = 0; i < path.size(); ++i ) {
+      for ( size_t i = 0; i < tour.size(); ++i ) {
         for ( vector< size_t >::const_iterator jIt = nearestNeighbors[ i ].begin(); jIt != nearestNeighbors[ i ].end(); ++jIt ) {
-          size_t indexOfIInPath = position[ i ];
-          size_t indexOfJInPath = position[ *jIt ];
-          assert( indexOfJInPath != indexOfIInPath );
+          size_t indexOfIIntour = position[ i ];
+          size_t indexOfJIntour = position[ *jIt ];
+          assert( indexOfJIntour != indexOfIIntour );
           for ( vector< size_t >::const_iterator kIt = nearestNeighbors[ *jIt ].begin(); kIt != nearestNeighbors[ *jIt ].end(); ++kIt ) {
-            size_t indexOfKInPath = position[ *kIt ];
-            assert( indexOfKInPath != indexOfJInPath );
-            if ( indexOfKInPath == indexOfIInPath ) {
+            size_t indexOfKIntour = position[ *kIt ];
+            assert( indexOfKIntour != indexOfJIntour );
+            if ( indexOfKIntour == indexOfIIntour ) {
               continue;
             }
-            if ( update3Opt_( indexOfIInPath, indexOfJInPath, indexOfKInPath, path, distances ) ) {
+            if ( update3Opt_( indexOfIIntour, indexOfJIntour, indexOfKIntour, tour, distances ) ) {
               changed = true;
-              for ( size_t i = 0; i < path.size(); ++i ) {
-                position[ path[ i ] ] = i;
+              for ( size_t i = 0; i < tour.size(); ++i ) {
+                position[ tour[ i ] ] = i;
               }
               break;
             }
@@ -541,58 +544,58 @@ namespace {
                     size_t j,
                     size_t k,
                     size_t l,
-                    vector< size_t >& path,
+                    vector< size_t >& tour,
                     const vector< vector< double > >& distances )
   {
     vector< size_t > vertices( 4 );
     vertices[ 0 ] = i; vertices[ 1 ] = j; vertices[ 2 ] = k; vertices[ 3 ] = l;
     sort( vertices.begin(), vertices.end() );
     i = vertices[ 0 ]; j = vertices[ 1 ]; k = vertices[ 2 ]; l = vertices[ 3 ];
-    assert( i < j && j < k );
-    const size_t pathI = path[ i ];
-    const size_t iMinus1 = ( i + path.size() - 1 ) % path.size();
-    const size_t pathIminus1 = path[ iMinus1 ];
-    const size_t pathJ = path[ j ];
-    const size_t jMinus1 = ( j + path.size() - 1 ) % path.size();
-    const size_t pathJminus1 = path[ jMinus1 ];
-    const size_t pathK = path[ k ];
-    const size_t kMinus1 = ( k + path.size() - 1 ) % path.size();
-    const size_t pathKminus1 = path[ kMinus1 ];
-    const size_t pathL = path[ l ];
-    const size_t lMinus1 = ( l + path.size() - 1 ) % path.size();
-    const size_t pathLminus1 = path[ lMinus1 ];
+    assert( i < j && j < k && k < l );
+    const size_t tourI = tour[ i ];
+    const size_t iMinus1 = ( i + tour.size() - 1 ) % tour.size();
+    const size_t tourIminus1 = tour[ iMinus1 ];
+    const size_t tourJ = tour[ j ];
+    const size_t jMinus1 = ( j + tour.size() - 1 ) % tour.size();
+    const size_t tourJminus1 = tour[ jMinus1 ];
+    const size_t tourK = tour[ k ];
+    const size_t kMinus1 = ( k + tour.size() - 1 ) % tour.size();
+    const size_t tourKminus1 = tour[ kMinus1 ];
+    const size_t tourL = tour[ l ];
+    const size_t lMinus1 = ( l + tour.size() - 1 ) % tour.size();
+    const size_t tourLminus1 = tour[ lMinus1 ];
     const double eps = 1e-9;
-    const double removedDistance = distances[ pathIminus1 ][ pathI ] +
-                                   distances[ pathJminus1 ][ pathJ ] +
-                                   distances[ pathKminus1 ][ pathK ] +
-                                   distances[ pathLminus1 ][ pathL ] - eps; // subtract a little something to avoid numerical errors
-    double newDistance = distances[ pathI ][ pathKminus1 ] + distances[ pathJ ][ pathLminus1 ] + distances[ pathK ][ pathIminus1 ] + distances[ pathL ][ pathJminus1 ];
+    const double removedDistance = distances[ tourIminus1 ][ tourI ] +
+                                   distances[ tourJminus1 ][ tourJ ] +
+                                   distances[ tourKminus1 ][ tourK ] +
+                                   distances[ tourLminus1 ][ tourL ] - eps; // subtract a little something to avoid numerical errors
+    double newDistance = distances[ tourI ][ tourKminus1 ] + distances[ tourJ ][ tourLminus1 ] + distances[ tourK ][ tourIminus1 ] + distances[ tourL ][ tourJminus1 ];
     if ( newDistance < removedDistance ) {
-      vector< size_t > pathCopy( path );
-      size_t pathIndex = i;
-      copy( pathCopy.begin() + k, pathCopy.begin() + l, path.begin() + pathIndex );
-      pathIndex += l - k;
-      copy( pathCopy.begin() + j, pathCopy.begin() + k, path.begin() + pathIndex );
-      pathIndex += k - j;
-      copy( pathCopy.begin() + i, pathCopy.begin() + j, path.begin() + pathIndex );
+      vector< size_t > tourCopy( tour );
+      size_t tourIndex = i;
+      copy( tourCopy.begin() + k, tourCopy.begin() + l, tour.begin() + tourIndex );
+      tourIndex += l - k;
+      copy( tourCopy.begin() + j, tourCopy.begin() + k, tour.begin() + tourIndex );
+      tourIndex += k - j;
+      copy( tourCopy.begin() + i, tourCopy.begin() + j, tour.begin() + tourIndex );
       return true;
     }
     return false;
   }
 
-  void compute4OptPath_( vector< size_t >& path,
+  void compute4OptTour_( vector< size_t >& tour,
                          const vector< vector< double > >& distances,
                          const vector< vector< size_t > >& nearestNeighbors )
   {
-    vector< size_t > position( path.size() );
-    for ( size_t i = 0; i < path.size(); ++i ) {
-      position[ path[ i ] ] = i;
+    vector< size_t > position( tour.size() );
+    for ( size_t i = 0; i < tour.size(); ++i ) {
+      position[ tour[ i ] ] = i;
     }
     bool changed = true;
     size_t maxNeighbors = 10;
     while ( changed ) {
       changed = false;
-      for ( size_t i = 0; i < path.size(); ++i ) {
+      for ( size_t i = 0; i < tour.size(); ++i ) {
         for ( vector< size_t >::const_iterator jIt = nearestNeighbors[ i ].begin(); jIt != nearestNeighbors[ i ].end(); ++jIt ) {
           if ( jIt - nearestNeighbors[ i ].begin() > int( maxNeighbors ) ) {
             break;
@@ -605,20 +608,20 @@ namespace {
               if ( lIt - nearestNeighbors[ *kIt ].begin() > int( maxNeighbors ) ) {
                 break;
               }
-              size_t indexOfIInPath = position[ i ];
-              size_t indexOfJInPath = position[ *jIt ];
-              size_t indexOfKInPath = position[ *kIt ];
-              size_t indexOfLInPath = position[ *lIt ];
-              assert( indexOfJInPath != indexOfIInPath );
-              assert( indexOfKInPath != indexOfJInPath );
-              assert( indexOfLInPath != indexOfKInPath );
-              if ( indexOfKInPath == indexOfIInPath || indexOfLInPath == indexOfIInPath || indexOfLInPath == indexOfJInPath ) {
+              size_t indexOfIIntour = position[ i ];
+              size_t indexOfJIntour = position[ *jIt ];
+              size_t indexOfKIntour = position[ *kIt ];
+              size_t indexOfLIntour = position[ *lIt ];
+              assert( indexOfJIntour != indexOfIIntour );
+              assert( indexOfKIntour != indexOfJIntour );
+              assert( indexOfLIntour != indexOfKIntour );
+              if ( indexOfKIntour == indexOfIIntour || indexOfLIntour == indexOfIIntour || indexOfLIntour == indexOfJIntour ) {
                 continue;
               }
-              if ( update4Opt_( indexOfIInPath, indexOfJInPath, indexOfKInPath, indexOfLInPath, path, distances ) ) {
+              if ( update4Opt_( indexOfIIntour, indexOfJIntour, indexOfKIntour, indexOfLIntour, tour, distances ) ) {
                 changed = true;
-                for ( size_t i = 0; i < path.size(); ++i ) {
-                  position[ path[ i ] ] = i;
+                for ( size_t i = 0; i < tour.size(); ++i ) {
+                  position[ tour[ i ] ] = i;
                 }
                 break;
               }
@@ -629,66 +632,115 @@ namespace {
     }
   }
 
-
-  bool update2Opt_( size_t i,
+  bool update5Opt_( size_t i,
                     size_t j,
-                    vector< size_t >& path,
+                    size_t k,
+                    size_t l,
+                    size_t m,
+                    vector< size_t >& tour,
                     const vector< vector< double > >& distances )
   {
-    assert( i < j );
+    vector< size_t > vertices( 5 );
+    vertices[ 0 ] = i; vertices[ 1 ] = j; vertices[ 2 ] = k; vertices[ 3 ] = l; vertices[ 4 ] = m;
+    sort( vertices.begin(), vertices.end() );
+    i = vertices[ 0 ]; j = vertices[ 1 ]; k = vertices[ 2 ]; l = vertices[ 3 ]; m = vertices[ 4 ];
+    assert( i < j && j < k && k < l && l < m);
+    const size_t tourI = tour[ i ];
+    const size_t iMinus1 = ( i + tour.size() - 1 ) % tour.size();
+    const size_t tourIminus1 = tour[ iMinus1 ];
+    const size_t tourJ = tour[ j ];
+    const size_t jMinus1 = ( j + tour.size() - 1 ) % tour.size();
+    const size_t tourJminus1 = tour[ jMinus1 ];
+    const size_t tourK = tour[ k ];
+    const size_t kMinus1 = ( k + tour.size() - 1 ) % tour.size();
+    const size_t tourKminus1 = tour[ kMinus1 ];
+    const size_t tourL = tour[ l ];
+    const size_t lMinus1 = ( l + tour.size() - 1 ) % tour.size();
+    const size_t tourLminus1 = tour[ lMinus1 ];
+    const size_t tourM = tour[ m ];
+    const size_t mMinus1 = ( m + tour.size() - 1 ) % tour.size();
+    const size_t tourMminus1 = tour[ mMinus1 ];
     const double eps = 1e-9;
-    const size_t t0 = path[ i == 0 ? path.size() - 1 : i - 1 ];
-    const size_t t1 = path[ i ];
-    const size_t t2 = path[ j == 0 ? path.size() - 1 : j - 1 ];
-    const size_t t3 = path[ j % path.size() ];
-    if ( distances[ t0 ][ t2 ] + distances[ t1 ][ t3 ] <
-         distances[ t0 ][ t1 ] + distances[ t2 ][ t3 ] - eps ) {
-      reverse( path.begin() + i, path.begin() + j );
+    const double removedDistance = distances[ tourIminus1 ][ tourI ] +
+                                   distances[ tourJminus1 ][ tourJ ] +
+                                   distances[ tourKminus1 ][ tourK ] +
+                                   distances[ tourLminus1 ][ tourL ] +
+                                   distances[ tourMminus1 ][ tourM ] - eps; // subtract a little something to avoid numerical errors
+    double newDistance = distances[ tourI ][ tourKminus1 ] +
+                         distances[ tourJ ][ tourLminus1 ] +
+                         distances[ tourK ][ tourMminus1 ] +
+                         distances[ tourL ][ tourIminus1 ] +
+                         distances[ tourM ][ tourJminus1 ];
+    if ( newDistance < removedDistance ) {
+      vector< size_t > tourCopy( tour );
+      size_t tourIndex = i;
+      copy( tourCopy.begin() + l, tourCopy.begin() + m, tour.begin() + tourIndex );
+      tourIndex += m - l;
+      copy( tourCopy.begin() + k, tourCopy.begin() + l, tour.begin() + tourIndex );
+      tourIndex += l - k;
+      copy( tourCopy.begin() + j, tourCopy.begin() + k, tour.begin() + tourIndex );
+      tourIndex += k - j;
+      copy( tourCopy.begin() + i, tourCopy.begin() + j, tour.begin() + tourIndex );
       return true;
     }
     return false;
   }
 
-  double getGain_( size_t i,
-                   size_t j,
-                   vector< size_t >& path,
-                   const vector< vector< double > >& distances )
+  void compute5OptTour_( vector< size_t >& tour,
+                         const vector< vector< double > >& distances,
+                         const vector< vector< size_t > >& nearestNeighbors )
   {
-    assert( i < j );
-    const double eps = 1e-9;
-    const size_t t0 = path[ i == 0 ? path.size() - 1 : i - 1 ];
-    const size_t t1 = path[ i ];
-    const size_t t2 = path[ j == 0 ? path.size() - 1 : j - 1 ];
-    const size_t t3 = path[ j % path.size() ];
-    return ( distances[ t0 ][ t1 ] + distances[ t2 ][ t3 ] - ( distances[ t0 ][ t2 ] + distances[ t1 ][ t3 ] ) ) - eps;
-  }
-
-  void compute2OptPath_( vector< size_t >& path,
-                         const vector< vector< double > >& distances )
-  {
+    vector< size_t > position( tour.size() );
+    for ( size_t i = 0; i < tour.size(); ++i ) {
+      position[ tour[ i ] ] = i;
+    }
     bool changed = true;
+    size_t maxNeighbors = 10;
     while ( changed ) {
       changed = false;
-      for ( size_t i = 0; i < path.size(); ++i ) {
-        size_t bestI = (size_t)-1;
-        size_t bestJ = (size_t)-1;
-        double bestGain = 0.0;
-        // Cutting the edges of two neighboring nodes does not lead to a new path. Hence start from i + 2.
-        for ( size_t j = i + 2; j < path.size(); ++j ) {
-          double gain = getGain_( i, j, path, distances ) ;
-          if ( gain > bestGain ) {
-            bestI = i;
-            bestJ = j;
-            bestGain = gain;
-            changed = true;
+      for ( size_t i = 0; i < tour.size(); ++i ) {
+        for ( vector< size_t >::const_iterator jIt = nearestNeighbors[ i ].begin(); jIt != nearestNeighbors[ i ].end(); ++jIt ) {
+          if ( jIt - nearestNeighbors[ i ].begin() > int( maxNeighbors ) ) {
+            break;
           }
-        }
-        if ( bestGain > 0.0 ) {
-          assert( update2Opt_( bestI, bestJ, path, distances ) );
+          for ( vector< size_t >::const_iterator kIt = nearestNeighbors[ *jIt ].begin(); kIt != nearestNeighbors[ *jIt ].end(); ++kIt ) {
+            if ( kIt - nearestNeighbors[ *jIt ].begin() > int( maxNeighbors ) ) {
+              break;
+            }
+            for ( vector< size_t >::const_iterator lIt = nearestNeighbors[ *kIt ].begin(); lIt != nearestNeighbors[ *kIt ].end(); ++lIt ) {
+              if ( lIt - nearestNeighbors[ *kIt ].begin() > int( maxNeighbors ) ) {
+                break;
+              }
+              for ( vector< size_t >::const_iterator mIt = nearestNeighbors[ *lIt ].begin(); mIt != nearestNeighbors[ *lIt ].end(); ++mIt ) {
+                if ( mIt - nearestNeighbors[ *lIt ].begin() > int( maxNeighbors ) ) {
+                  break;
+                }
+                size_t indexOfIIntour = position[ i ];
+                size_t indexOfJIntour = position[ *jIt ];
+                size_t indexOfKIntour = position[ *kIt ];
+                size_t indexOfLIntour = position[ *lIt ];
+                size_t indexOfMIntour = position[ *mIt ];
+                assert( indexOfJIntour != indexOfIIntour );
+                assert( indexOfKIntour != indexOfJIntour );
+                assert( indexOfLIntour != indexOfKIntour );
+                assert( indexOfMIntour != indexOfLIntour );
+                if ( indexOfKIntour == indexOfIIntour || indexOfLIntour == indexOfIIntour || indexOfLIntour == indexOfJIntour ||
+                     indexOfMIntour == indexOfIIntour || indexOfMIntour == indexOfJIntour || indexOfMIntour == indexOfKIntour ) {
+                  continue;
+                }
+                if ( update5Opt_( indexOfIIntour, indexOfJIntour, indexOfKIntour, indexOfLIntour, indexOfMIntour, tour, distances ) ) {
+                  changed = true;
+                  for ( size_t i = 0; i < tour.size(); ++i ) {
+                    position[ tour[ i ] ] = i;
+                  }
+                  break;
+                }
+              }
+            }
+          }
         }
       }
     }
-    assertIsPath_( path, distances );
   }
 
   bool contains_( const vector< pair< size_t, size_t > >& xs, const pair< size_t, size_t >& x )
@@ -704,20 +756,20 @@ namespace {
     return false;
   }
 
-  void make2OptMove_( size_t it0, size_t it1, size_t it2, size_t it3, vector< size_t >& path )
+  void make2OptMove_( size_t it0, size_t it1, size_t it2, size_t it3, vector< size_t >& tour )
   {
     cerr << it0 << " " << it1 << " " << it2 << " " << it3 << endl;
-    assert( fabs( fabs( float( it0 ) - float( it1 ) ) - 1.0 ) < 1e-6 || fabs( fabs( float( it0 ) - float( it1 ) ) + 1.0 - float( path.size() ) ) < 1e-6  );
-    assert( fabs( fabs( float( it2 ) - float( it3 ) ) - 1.0 ) < 1e-6 || fabs( fabs( float( it2 ) - float( it3 ) ) + 1.0 - float( path.size() ) ) < 1e-6  );
+    assert( fabs( fabs( float( it0 ) - float( it1 ) ) - 1.0 ) < 1e-6 || fabs( fabs( float( it0 ) - float( it1 ) ) + 1.0 - float( tour.size() ) ) < 1e-6  );
+    assert( fabs( fabs( float( it2 ) - float( it3 ) ) - 1.0 ) < 1e-6 || fabs( fabs( float( it2 ) - float( it3 ) ) + 1.0 - float( tour.size() ) ) < 1e-6  );
     size_t ind1 = max( it0, it1 );
     size_t ind2 = max( it2, it3 );
     if ( ind1 > ind2 ) {
       swap( ind1, ind2 );
     }
-    reverse( path.begin() + ind1, path.begin() + ind2 );
+    reverse( tour.begin() + ind1, tour.begin() + ind2 );
   }
 
-  void computeLinKernighanPath_( vector< size_t >& path,
+  void computeLinKernighantour_( vector< size_t >& tour,
                                  const vector< vector< double > >& distances )
   {
     bool changed = true;
@@ -729,36 +781,36 @@ namespace {
       changed = false;
 restartLinKernighan:
       // Step 2. Let ind = 0. Choose t_0
-      for ( size_t i = 1; i < path.size(); ++i ) {
+      for ( size_t i = 1; i < tour.size(); ++i ) {
         vector< pair< size_t, size_t > > T;
-        for ( size_t j = 0; j < path.size(); ++j ) {
-          T.push_back( make_pair( path[ j ], path[ ( j + 1 ) % path.size() ] ) );
+        for ( size_t j = 0; j < tour.size(); ++j ) {
+          T.push_back( make_pair( tour[ j ], tour[ ( j + 1 ) % tour.size() ] ) );
         }
         size_t ind = 0;
         x.clear();
         y.clear();
         t.clear();
-        t.push_back( path[ i == 0 ? path.size() - 1 : i - 1 ] );
-        t.push_back( path[ i ] );
+        t.push_back( tour[ i == 0 ? tour.size() - 1 : i - 1 ] );
+        t.push_back( tour[ i ] );
         // Step 3. Choose x_0 = ( t_0, t_1 ) in T
         x.push_back( make_pair( t[ 0 ], t[ 1 ] ) );
-        for ( size_t j = i + 2; j < path.size(); ++j ) {
+        for ( size_t j = i + 2; j < tour.size(); ++j ) {
           // Step 4. Choose y_0 = ( t_1, t_2 ) not in T such that G > 0
-          if ( i < 2 && j + 1 == path.size() ) {
+          if ( i < 2 && j + 1 == tour.size() ) {
             continue;
           }
-          if ( contains_( T, make_pair( t[ 1 ], path[ j ] ) ) ) {
+          if ( contains_( T, make_pair( t[ 1 ], tour[ j ] ) ) ) {
             // y is in T
             continue;
           }
-          double G0 = distances[ t[ 0 ] ][ t[ 1 ] ] - distances[ t[ 1 ] ][ path[ j ] ];
+          double G0 = distances[ t[ 0 ] ][ t[ 1 ] ] - distances[ t[ 1 ] ][ tour[ j ] ];
           if ( G0 <= eps ) {
             continue;
           }
           double G = G0;
 
           // Found y not in T with positive gain
-          t.push_back( path[ j ] );
+          t.push_back( tour[ j ] );
           y.push_back( make_pair( t[ 1 ], t[ 2 ] ) ); // y_0
 
           size_t maxKForIndEquals2 = 0;
@@ -770,7 +822,7 @@ restartLinKernighan:
             // Step 6. Choose x_i = (t_(2i), t_(2i+1)) in T such that
             // (a) if t_(2i+1) is joined to t_0, the resulting configuration is a tour T'
             // (b) x_i != y_s for all s < i
-            size_t tNext = path[ ( ( find( path.begin(), path.end(), t.back() ) - path.begin() ) + path.size() - 1 ) % path.size() ]; // element in path previous to t_(2i)
+            size_t tNext = tour[ ( ( find( tour.begin(), tour.end(), t.back() ) - tour.begin() ) + tour.size() - 1 ) % tour.size() ]; // element in tour previous to t_(2i)
             assert( nextXExists ); // condition (b): x_i != y_s for all s < i
             x.push_back( make_pair( t.back(), tNext ) ); // Add x_i = (t_(2i), t_(2i+1))
             t.push_back( tNext ); // Add t_(2i+1)
@@ -780,15 +832,15 @@ restartLinKernighan:
               y.push_back( make_pair( t.back(), t.front() ) );
               changed = true;
               // Take tour
-              vector< size_t > pathCopy( path );
+              vector< size_t > tourCopy( tour );
               assert( t.size() % 2 == 0 );
               assert( x.size() == y.size() );
               cerr << "Take tour" << endl;
               cerr << "x.size() " << x.size() << endl;
               cerr << "G: " << G << " dist: " << distances[ t.back() ][ t.front() ] << endl;
-              cerr << "path: ";
-              for ( size_t k = 0; k < path.size(); ++k ) {
-                cerr << path[ k ] << " ";
+              cerr << "tour: ";
+              for ( size_t k = 0; k < tour.size(); ++k ) {
+                cerr << tour[ k ] << " ";
               }
               cerr << endl;
               cerr << "x: ";
@@ -802,19 +854,19 @@ restartLinKernighan:
               }
               cerr << endl;
               for ( size_t k = 1; k < x.size(); ++k ) {
-                size_t t0 = find( path.begin(), path.end(), x[ 0 ].first ) - path.begin();
-                size_t t1 = find( path.begin(), path.end(), x[ k - 1 ].second ) - path.begin();
-                size_t t2 = find( path.begin(), path.end(), x[ k ].first ) - path.begin();
-                size_t t3 = find( path.begin(), path.end(), x[ k ].second ) - path.begin();
+                size_t t0 = find( tour.begin(), tour.end(), x[ 0 ].first ) - tour.begin();
+                size_t t1 = find( tour.begin(), tour.end(), x[ k - 1 ].second ) - tour.begin();
+                size_t t2 = find( tour.begin(), tour.end(), x[ k ].first ) - tour.begin();
+                size_t t3 = find( tour.begin(), tour.end(), x[ k ].second ) - tour.begin();
                 cerr << "2opt: (" << x[ 0 ].first << ", " << x[ k - 1].second << "), (" << x[ k ].first << ", " << x[ k ].second << ")" << endl;
-                make2OptMove_( t0, t1, t2, t3, path );
+                make2OptMove_( t0, t1, t2, t3, tour );
               }
-              assert( path != pathCopy );
+              assert( tour != tourCopy );
 
-              if ( getLength_( path, distances ) >= getLength_( pathCopy, distances ) ) {
-                cerr << setprecision( 28 ) << getLength_( path, distances ) << " " << getLength_( pathCopy, distances ) << endl;
+              if ( getLength_( tour, distances ) >= getLength_( tourCopy, distances ) ) {
+                cerr << setprecision( 28 ) << getLength_( tour, distances ) << " " << getLength_( tourCopy, distances ) << endl;
               }
-              assert( getLength_( path, distances ) < getLength_( pathCopy, distances ) );
+              assert( getLength_( tour, distances ) < getLength_( tourCopy, distances ) );
               goto restartLinKernighan;
             }
 
@@ -826,22 +878,22 @@ step7:
             // (c) x_(i+1) exists
             // If such y_i exists, go to step 5
             size_t startK = y.size() == 1 ? maxKForIndEquals2 : 0;
-            for ( size_t k = startK; k < path.size(); ++k ) {
+            for ( size_t k = startK; k < tour.size(); ++k ) {
               if ( y.size() == 1 ) {
                 ++maxKForIndEquals2;
               }
-              if ( k == i || k == j || t.back() == path[ k ] ) {
+              if ( k == i || k == j || t.back() == tour[ k ] ) {
                 continue;
               }
               pair< size_t, size_t > yCandidate;
-              yCandidate = make_pair( t.back(), path[ k ] );
+              yCandidate = make_pair( t.back(), tour[ k ] );
 
               // y is not in T
               if ( contains_( T, yCandidate ) ) {
                 continue;
               }
               // (a) G_i > 0
-              double gain = distances[ x.back().first ][ x.back().second ] - distances[ t.back() ][ path[ k ] ];
+              double gain = distances[ x.back().first ][ x.back().second ] - distances[ t.back() ][ tour[ k ] ];
               if ( G + gain <= eps ) {
                 continue;
               }
@@ -850,9 +902,9 @@ step7:
                 continue;
               }
               // (c) x_(i+1) exists
-              size_t tNextCandidate = path[ ( ( find( path.begin(), path.end(), path[ k ] ) - path.begin() ) + path.size() - 1 ) % path.size() ]; // element in path previous to t_(2i+2) candidate
+              size_t tNextCandidate = tour[ ( ( find( tour.begin(), tour.end(), tour[ k ] ) - tour.begin() ) + tour.size() - 1 ) % tour.size() ]; // element in tour previous to t_(2i+2) candidate
               pair< size_t, size_t > xCandidate;
-              xCandidate = make_pair( path[ k ], tNextCandidate );
+              xCandidate = make_pair( tour[ k ], tNextCandidate );
               nextXExists = !contains_( x, xCandidate ) &&
                             !contains_( y, xCandidate ) &&
                             tNextCandidate != t.back();
@@ -861,14 +913,14 @@ step7:
               }
               G += gain;
               y.push_back( yCandidate );
-              t.push_back( path[ k ] );
+              t.push_back( tour[ k ] );
 
               // Found y, goto step 5
               nextYExists = true;
               break;
             }
 
-            if ( !nextYExists && maxKForIndEquals2 < path.size() ) {
+            if ( !nextYExists && maxKForIndEquals2 < tour.size() ) {
               // Step 8. If there is an untried alternative for y_1, let i = 1 and go to Step 7
               y.resize( 1 );
               x.resize( 2 );
@@ -882,10 +934,432 @@ step7:
       }
     }
   }
+
+  size_t previous_( size_t node, const vector< size_t >& tour, const vector< size_t >& position )
+  {
+    return tour[ ( position[ node ] + tour.size() - 1 ) % tour.size() ];
+  }
+
+  size_t next_( size_t node, const vector< size_t >& tour, const vector< size_t >& position )
+  {
+    return tour[ ( position[ node ] + 1 ) % tour.size() ];
+  }
+
+  bool between_( size_t a, size_t b, size_t c, const vector< size_t >& tour, const vector< size_t >& position )
+  {
+    return ( position[ a ] < position[ c ] && position[ c ] < position[ b ] ) ||
+           ( position[ b ] < position[ a ] && position[ a ] < position[ c ] ) ||
+           ( position[ c ] < position[ b ] && position[ b ] < position[ a ] );
+  }
+
+  void flip_( vector< size_t >& tour, vector< size_t >& position, size_t t1, size_t t2, size_t t3, size_t t4 )
+  {
+
+    if ( !( t2 == next_( t1, tour, position ) && t3 == next_( t4, tour, position ) ) ) {
+      cerr << "tpos: " << position[ t2 ] << " " << position[ t1 ] << " " << position[ t3 ] << " " << position[ t4 ] << endl;
+    }
+    assert( t2 == next_( t1, tour, position ) && t3 == next_( t4, tour, position ) );
+    size_t pt2 = position[ t2 ];
+    size_t pt3 = position[ t3 ];
+    if ( pt2 < pt3 ) {
+      reverse( tour.begin() + pt2, tour.begin() + pt3 );
+    }
+    else {
+      vector< size_t >::iterator iIt = tour.begin() + pt2;
+      vector< size_t >::iterator jIt = tour.begin() + pt3;
+      while ( iIt != tour.end() && jIt != tour.begin() ) {
+        --jIt;
+        iter_swap( iIt, jIt );
+        ++iIt;
+      }
+      if ( iIt == tour.end() ) {
+        reverse( tour.begin(), jIt );
+      }
+      else {
+        reverse( iIt, tour.end() );
+      }
+    }
+    for ( size_t i = 0; i < tour.size(); ++i ) {
+      position[ tour[ i ] ] = i;
+    }
+  }
+
+  void performMove_( const vector< size_t >& ts, vector< size_t >& tour, vector< size_t >& position )
+  {
+    assert( ts.size() == 4 || ts.size() == 6 );
+    if ( ts.size() == 4 ) {
+      size_t t1 = ts[ 0 ];
+      size_t t2 = ts[ 1 ];
+      size_t t3 = ts[ 2 ];
+      size_t t4 = ts[ 3 ];
+      if ( t1 == next_( t2, tour, position ) ) {
+        swap( t1, t2 );
+      }
+      if ( t4 == next_( t3, tour, position ) ) {
+        swap( t3, t4 );
+      }
+      flip_( tour, position, t1, t2, t3, t4 );
+    }
+    else {
+      size_t t1 = ts[ 0 ];
+      size_t t2 = ts[ 1 ];
+      size_t t3 = ts[ 2 ];
+      size_t t4 = ts[ 3 ];
+      size_t t5 = ts[ 4 ];
+      size_t t6 = ts[ 5 ];
+
+//      cerr << "ts: " << t1 << " " << t2 << " " << t3 << " " << t4 << " " << t5 << " " << t6 << endl;
+//      cerr << "pts: " << position[t1] << " " << position[t2] << " " << position[t3] << " " << position[t4] << " " << position[t5] << " " << position[t6] << endl;
+
+//      cerr << "tour before: ";
+//      for ( size_t i = 0; i< tour.size(); ++i ) {
+//        cerr << tour[ i ] << " ";
+//      }
+//      cerr << endl;
+      if ( t1 == next_( t2, tour, position ) ) {
+        swap( t1, t2 );
+      }
+      if ( t4 == next_( t3, tour, position ) ) {
+        swap( t3, t4 );
+      }
+      flip_( tour, position, t1, t2, t3, t4 );
+//      cerr << "tour intermediate: ";
+//      for ( size_t i = 0; i< tour.size(); ++i ) {
+//        cerr << tour[ i ] << " ";
+//      }
+//      cerr << endl;
+
+      t1 = ts[ 0 ];
+      t4 = ts[ 3 ];
+      t5 = ts[ 4 ];
+      t6 = ts[ 5 ];
+
+      t2 = ts[ 1 ];
+      t3 = ts[ 2 ];
+
+//      cerr << "pts2: " << position[t1] << " " << position[t2] << " " << position[t3] << " " << position[t4] << " " << position[t5] << " " << position[t6] << endl;
+
+      if ( t1 == next_( t4, tour, position ) ) {
+        swap( t1, t4 );
+      }
+      if ( t6 == next_( t5, tour, position ) ) {
+        swap( t5, t6 );
+      }
+      flip_( tour, position, t1, t4, t5, t6 );
+    }
+  }
+
+  void compute3OptTour_( vector< size_t >& tour,
+                         const vector< vector< double > >& distances,
+                         const vector< vector< size_t > >& nearestNeighbors )
+  {
+    const double eps = 1e-9;
+    vector< size_t > position( tour.size() );
+    for ( size_t i = 0; i < tour.size(); ++i ) {
+      position[ tour[ i ] ] = i;
+    }
+
+    bool changed = true;
+    vector< size_t > bestTs;
+    while ( changed ) {
+      changed = false;
+      for ( size_t t1 = 0; t1 < tour.size(); ++t1 ) {
+        bestTs.assign( 1, t1 );
+        double G = 0.0;
+        for ( size_t t2choice = 0; t2choice < 2; ++t2choice  ) {
+          size_t t2 = t2choice == 0 ? previous_( t1, tour, position ) : next_( t1, tour, position );
+          for ( size_t t3index = 0; t3index < nearestNeighbors[ t2 ].size(); ++t3index ) {
+            size_t t3 = nearestNeighbors[ t2 ][ t3index ];
+            if ( t3 == previous_( t2, tour, position ) || t3 == next_( t2, tour, position ) ) {
+              continue;
+            }
+            double g1 = distances[ t1 ][ t2 ] - distances[ t2 ][ t3 ] - eps;
+            if ( g1 <= 0.0 ) {
+              continue;
+            }
+            // First choice of t4
+            size_t t4 = t2choice == 0 ? next_( t3, tour, position ) : previous_( t3, tour, position );
+            if ( t4 == previous_( t2, tour, position ) || t4 == next_( t2, tour, position ) ) {
+              continue;
+            }
+            {
+              // Test for improving 2-opt move
+              double gain = g1 + distances[ t3 ][ t4 ] - distances[ t4 ][ t1 ];
+              if ( gain > G ) {
+                G = gain;
+                bestTs.resize( 1 );
+                bestTs.push_back( t2 );
+                bestTs.push_back( t3 );
+                bestTs.push_back( t4 );
+              }
+            }
+            for ( size_t t5index = 0; t5index < nearestNeighbors[ t4 ].size(); ++t5index ) {
+              size_t t5 = nearestNeighbors[ t4 ][ t5index ];
+              if ( t5 == previous_( t4, tour, position ) || t5 == next_( t4, tour, position ) ) {
+                continue;
+              }
+              double g2 = distances[ t3 ][ t4 ] - distances[ t4 ][ t5 ];
+              if ( g1 + g2 <= 0.0 ) {
+                continue;
+              }
+
+              // Select t6 such that a valid tour is created
+//              bool betweenT3T1 = between_( t3, t1, t5, tour, position );
+//                cerr << "type 1 " << t5 << " " << next_( t5, tour, position ) << " " << previous_( t5, tour, position ) << endl;
+              size_t t6 = between_( t2, t4, t5, tour, position ) ? next_( t5, tour, position ) : previous_( t5, tour, position );
+              if ( t6 == t1 ) {
+                continue;
+              }
+              double g3 = distances[ t5 ][ t6 ] - distances[ t6 ][ t1 ];
+              double gain = g1 + g2 + g3;
+              if ( gain > G ) {
+                G = gain;
+//                cerr << "set gain1 " << position[ t1 ] << " " << position[ t2] << endl;
+                bestTs.resize( 1 );
+                bestTs.push_back( t2 );
+                bestTs.push_back( t3 );
+                bestTs.push_back( t4 );
+                bestTs.push_back( t5 );
+                bestTs.push_back( t6 );
+              }
+            }
+
+            // Second choice of t4
+            continue;
+
+            t4 = t2choice == 0 ? previous_( t3, tour, position ) : next_( t3, tour, position );
+            for ( size_t t5index = 0; t5index < nearestNeighbors[ t4 ].size(); ++t5index ) {
+              size_t t5 = nearestNeighbors[ t4 ][ t5index ];
+              if ( t5 == previous_( t4, tour, position ) || t5 == next_( t4, tour, position ) ) {
+                continue;
+              }
+              if ( ( t2choice == 0 && !between_( t3, t2, t5, tour, position ) ) ||
+                   ( t2choice == 1 && !between_( t2, t3, t5, tour, position ) ) ) {
+                continue;
+              }
+              double g2 = distances[ t3 ][ t4 ] - distances[ t4 ][ t5 ];
+              if ( g1 + g2 <= 0.0 ) {
+                continue;
+              }
+              for ( size_t t6choice = 0; t6choice < 2; ++t6choice ) {
+                size_t t6 = t6choice == 0 ? next_( t5, tour, position ) : previous_( t5, tour, position );
+                if ( t6 == t3 || t6 == t2 ) {
+                  continue;
+                }
+                if ( t6 == previous_( t1, tour, position ) || t6 == next_( t1, tour, position ) ||
+                     t6 == previous_( t2, tour, position ) || t6 == next_( t2, tour, position ) ||
+                     t6 == previous_( t4, tour, position ) || t6 == next_( t4, tour, position ) ) {
+                  continue;
+                }
+/*                cerr << "type 2" << endl;
+               cerr << "t2choice " << t2choice << endl;
+              cerr << "t1-5: " << t1 << " " << t2 << " " << t3 << " " << t4 << " " << t5 << " " << t6 << endl;
+              cerr << "p t1-5: " << position[ t1 ] << " " << position[ t2 ] << " " << position[ t3 ] << " " << position[ t4 ] << " " << position[ t5 ] << " " << position[ t6 ] << endl;
+              */
+                double g3 = distances[ t5 ][ t6 ] - distances[ t6 ][ t1 ];
+                double gain = g1 + g2 + g3;
+                if ( gain > G ) {
+                  G = gain;
+//                  cerr << "set gain2 " << position[t1] << " " << position[t2] << endl;
+                  bestTs.resize( 1 );
+                  bestTs.push_back( t2 );
+                  bestTs.push_back( t5 );
+                  bestTs.push_back( t6 );
+                  bestTs.push_back( t3 );
+                  bestTs.push_back( t4 );
+                }
+              }
+            }
+          }
+        }
+        if ( G > 0.0 ) {
+          changed = true;
+          vector< size_t > tourCopy( tour );
+          performMove_( bestTs, tour, position );
+          if ( getLength_( tour, distances ) >= getLength_( tourCopy, distances ) ) {
+            cerr << getLength_( tour, distances ) << " " << getLength_( tourCopy, distances ) << endl;
+          }
+          assert( getLength_( tour, distances ) < getLength_( tourCopy, distances ) );
+        }
+      }
+    }
+  }
+
+  void compute2OptTour_( vector< size_t >& tour,
+                         const vector< vector< double > >& distances,
+                         const vector< vector< size_t > >& nearestNeighbors )
+  {
+    const double eps = 1e-9;
+    vector< size_t > position( tour.size() );
+    for ( size_t i = 0; i < tour.size(); ++i ) {
+      position[ tour[ i ] ] = i;
+    }
+
+    vector< size_t > bestTs;
+    bool changed = true;
+    while ( changed ) {
+      changed = false;
+      for ( size_t t1 = 0; t1 < tour.size(); ++t1 ) {
+        bestTs.assign( 4, (size_t)-1 );
+        double maxGain = 0.0;
+        for ( size_t t2choice = 0; t2choice < 2; ++t2choice  ) {
+          size_t t2 = t2choice == 0 ? previous_( t1, tour, position ) : next_( t1, tour, position );
+          for ( size_t t3index = 0; t3index < nearestNeighbors[ t2 ].size(); ++t3index ) {
+            size_t t3 = nearestNeighbors[ t2 ][ t3index ];
+            if ( t3 == previous_( t2, tour, position ) || t3 == next_( t2, tour, position ) ) {
+              continue;
+            }
+            if ( distances[ t2 ][ t3 ] >= distances[ t1 ][ t2 ] ) {
+              break;
+            }
+            size_t t4 = t2choice == 0 ? next_( t3, tour, position ) : previous_( t3, tour, position );
+            double gain = distances[ t1 ][ t2 ] + distances[ t3 ][ t4 ] - ( distances[ t1 ][ t4 ] + distances[ t2 ][ t3 ] ) - eps;
+            if ( gain > maxGain ) {
+              maxGain = gain;
+              bestTs[ 0 ] = t1;
+              bestTs[ 1 ] = t2;
+              bestTs[ 2 ] = t3;
+              bestTs[ 3 ] = t4;
+            }
+          }
+        }
+        if ( maxGain > 0.0 ) {
+          changed = true;
+          performMove_( bestTs, tour, position );
+          for ( size_t i = 0; i < tour.size(); ++i ) {
+            position[ tour[ i ] ] = i;
+          }
+        }
+      }
+    }
+  }
+
+  bool update2Opt_( size_t i,
+                    size_t j,
+                    vector< size_t >& tour,
+                    const vector< vector< double > >& distances )
+  {
+    assert( i < j );
+    const double eps = 1e-9;
+    const size_t t0 = tour[ i == 0 ? tour.size() - 1 : i - 1 ];
+    const size_t t1 = tour[ i ];
+    const size_t t2 = tour[ j == 0 ? tour.size() - 1 : j - 1 ];
+    const size_t t3 = tour[ j % tour.size() ];
+    if ( distances[ t0 ][ t2 ] + distances[ t1 ][ t3 ] <
+         distances[ t0 ][ t1 ] + distances[ t2 ][ t3 ] - eps ) {
+      reverse( tour.begin() + i, tour.begin() + j );
+      return true;
+    }
+    return false;
+  }
+
+  double getGain_( size_t i,
+                   size_t j,
+                   vector< size_t >& tour,
+                   const vector< vector< double > >& distances )
+  {
+    assert( i < j );
+    const double eps = 1e-9;
+    const size_t t0 = tour[ i == 0 ? tour.size() - 1 : i - 1 ];
+    const size_t t1 = tour[ i ];
+    const size_t t2 = tour[ j == 0 ? tour.size() - 1 : j - 1 ];
+    const size_t t3 = tour[ j % tour.size() ];
+    return ( distances[ t0 ][ t1 ] + distances[ t2 ][ t3 ] - ( distances[ t0 ][ t2 ] + distances[ t1 ][ t3 ] ) ) - eps;
+  }
+
+  void compute2OptTour_( vector< size_t >& tour,
+                         const vector< vector< double > >& distances )
+  {
+    bool changed = true;
+    while ( changed ) {
+      changed = false;
+      for ( size_t i = 0; i < tour.size(); ++i ) {
+        size_t bestI = (size_t)-1;
+        size_t bestJ = (size_t)-1;
+        double bestGain = 0.0;
+        // Cutting the edges of two neighboring nodes does not lead to a new tour. Hence start from i + 2.
+        for ( size_t j = i + 2; j < tour.size(); ++j ) {
+          double gain = getGain_( i, j, tour, distances ) ;
+          if ( gain > bestGain ) {
+            bestI = i;
+            bestJ = j;
+            bestGain = gain;
+            changed = true;
+          }
+        }
+        if ( bestGain > 0.0 ) {
+          assert( update2Opt_( bestI, bestJ, tour, distances ) );
+        }
+      }
+    }
+    assertIsTour_( tour, distances );
+  }
+
+  void computeDoubleBridgeTour_( vector< size_t >& tour,
+                                 const vector< vector< double > >& distances,
+                                 const vector< vector< size_t > >& nearestNeighbors )
+  {
+    vector< size_t > position( tour.size() );
+    for ( size_t i = 0; i < tour.size(); ++i ) {
+      position[ tour[ i ] ] = i;
+    }
+    vector< size_t > bestTs;
+    bool changed = true;
+    while ( changed ) {
+      changed = false;
+      for ( size_t t1 = 0; t1 < tour.size(); ++t1 ) {
+        size_t t2 = next_( t1, tour, position );
+        bestTs.assign( 1, t1 );
+        bestTs.push_back( t2 );
+
+        // Select t3 from t2's neighbors
+        for ( size_t t3index = 0; t3index != nearestNeighbors[ t2 ].size(); ++t3index ) {
+          size_t t3 = nearestNeighbors[ t2 ][ t3index ];
+          size_t t4 = next_( t3, tour, position );
+          if ( t3 == t1 ||
+               t4 == t1 ||
+               t3 == next_( t2, tour, position ) ||
+               t4 == previous_( t1, tour, position ) ) {
+            continue;
+          }
+
+          for ( size_t t5 = next_( t2, tour, position ); t5 != previous_( t3, tour, position ); t5 = next_( t5, tour, position  ) ) {
+            size_t t6 = next_( t5, tour, position );
+            if ( t5 == t1 ||
+                 t6 == t1 ) {
+              continue;
+            }
+
+            // Select t7 from t6's neighbors
+            for ( size_t t7index = 0; t7index != nearestNeighbors[ t6 ].size(); ++t7index ) {
+              size_t t7 = nearestNeighbors[ t6 ][ t7index ];
+              size_t t8 = next_( t7, tour, position );
+              if ( t8 == t2 ||
+                   t8 == t6 ) {
+                continue;
+              }
+              if ( !between_( t4, t1, t7, tour, position ) || !between_( t4, t1, t8, tour, position ) ) {
+                continue;
+              }
+              if ( update4Opt_( position[ t2 ], position[ t6 ], position[ t4 ], position[ t8 ], tour, distances ) ) {
+                changed = true;
+                for ( size_t i = 0; i < tour.size(); ++i ) {
+                  position[ tour[ i ] ] = i;
+                }
+                break;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
 } // anonymous namespace
 
+
 namespace TravelingSalespersonProblemSolver {
-  vector< size_t > computePath( const vector< vector< double > >& distances )
+  vector< size_t > computeTour( const vector< vector< double > >& distances )
   {
     assert( distances.size() > 0 );
     srand( 1729 );
@@ -900,16 +1374,23 @@ namespace TravelingSalespersonProblemSolver {
         }
       }
     }
-    vector< size_t > pathRand = getRandomPath_( distances );
-    vector< size_t > pathNN = getNearestNeighborPath_( distances );
-    vector< size_t > pathGreedy = getGreedyPath_( distances );
-    vector< size_t > path( pathGreedy );
-    vector< vector< size_t > > nearestNeighbors = computeNearestNeighbors_( distances, 20 );
+    const vector< size_t > tourRand = getRandomtour_( distances );
+    const vector< size_t > tourNN = getNearestNeighbortour_( distances );
+    const vector< size_t > tourGreedy = getGreedyTour_( distances );
+    vector< size_t > tour( tourGreedy );
+    cerr << setprecision( 8 );
 
-    cerr << setprecision( 7 );
-    cerr << "Initial distance: " << getLength_( path, distances ) << endl;
-    cerr << "Nearest neighbor distance: " << getLength_( pathNN, distances ) << endl;
-    cerr << "Greedy distance: " << getLength_( pathGreedy, distances ) << endl;
+    vector< vector< size_t > > nearestNeighbors;
+    {
+      double start( clock() );
+      nearestNeighbors = computeNearestNeighbors_( distances, 20 );
+      double time( ( clock() - start ) / CLOCKS_PER_SEC );
+      cerr << "Time to compute " << nearestNeighbors.front().size() << " nearest neighbors: " << time << endl;
+    }
+
+    cerr << "Initial distance: " << getLength_( tour, distances ) << endl;
+    cerr << "Nearest neighbor distance: " << getLength_( tourNN, distances ) << endl;
+    cerr << "Greedy distance: " << getLength_( tourGreedy, distances ) << endl;
 
     if ( true ) {
       cerr << "1-tree distance: ";
@@ -921,35 +1402,36 @@ namespace TravelingSalespersonProblemSolver {
 
     if ( true ) {
       double start( clock() );
-      compute2OptPath_( path, distances );
+      compute2OptTour_( tour, distances, nearestNeighbors );
       double time( ( clock() - start ) / CLOCKS_PER_SEC );
-      cerr << "2-opt path distance: " << getLength_( path, distances ) << ", time: " << time << endl;
-      assertIsPath_( path, distances );
+      cerr << "2-opt tour distance: " << getLength_( tour, distances ) << ", time: " << time << endl;
+      assertIsTour_( tour, distances );
+    }
+
+    if ( true ) {
+      tour = tourGreedy;
+      double start( clock() );
+      compute3OptTour_( tour, distances, nearestNeighbors );
+      double time( ( clock() - start ) / CLOCKS_PER_SEC );
+      cerr << "3-opt tour distance: " << getLength_( tour, distances ) << ", time: " << time << endl;
+      assertIsTour_( tour, distances );
     }
 
     if ( true ) {
       double start( clock() );
-      compute3OptPath_( path, distances, nearestNeighbors );
+      compute4OptTour_( tour, distances, nearestNeighbors );
+      compute3OptTour_( tour, distances, nearestNeighbors );
       double time( ( clock() - start ) / CLOCKS_PER_SEC );
-      cerr << "3-opt path distance: " << getLength_( path, distances ) << ", time: " << time << endl;
-      assertIsPath_( path, distances );
-    }
-
-    if ( true ) {
-      double start( clock() );
-//      computeLinKernighanPath_( path, distances );
-      compute4OptPath_( path, distances, nearestNeighbors );
-      compute2OptPath_( path, distances );
-      compute3OptPath_( path, distances, nearestNeighbors );
-      double time( ( clock() - start ) / CLOCKS_PER_SEC );
-      cerr << "4-opt path distance: " << getLength_( path, distances ) << ", time: " << time << endl;
-      assertIsPath_( path, distances );
+      cerr << "4-opt tour distance: " << getLength_( tour, distances ) << ", time: " << time << endl;
+      assertIsTour_( tour, distances );
     }
 
     if ( false ) {
-      computeLinKernighanPath_( path, distances );
+      computeLinKernighantour_( tour, distances );
+      compute4OptTour_( tour, distances, nearestNeighbors );
+      compute5OptTour_( tour, distances, nearestNeighbors );
     }
 
-    return path;
+    return tour;
   }
 }
