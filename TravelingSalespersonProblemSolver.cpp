@@ -855,9 +855,9 @@ step7:
 
   bool between_( size_t a, size_t b, size_t c, const vector< size_t >& position )
   {
-    return ( position[ a ] < position[ c ] && position[ c ] < position[ b ] ) ||
-           ( position[ b ] < position[ a ] && position[ a ] < position[ c ] ) ||
-           ( position[ c ] < position[ b ] && position[ b ] < position[ a ] );
+    return ( position[ a ] <= position[ c ] && position[ c ] <= position[ b ] ) ||
+           ( position[ b ] <= position[ a ] && position[ a ] <= position[ c ] ) ||
+           ( position[ c ] <= position[ b ] && position[ b ] <= position[ a ] );
   }
 
   void flip_( vector< size_t >& tour, vector< size_t >& position, size_t t1, size_t t2, size_t t3, size_t t4 )
@@ -995,7 +995,8 @@ step7:
               double gain = g1 + distances[ t3 ][ t4 ] - distances[ t4 ][ t1 ];
               if ( gain > G ) {
                 G = gain;
-                bestTs.resize( 1 );
+                bestTs.clear();
+                bestTs.push_back( t1 );
                 bestTs.push_back( t2 );
                 bestTs.push_back( t3 );
                 bestTs.push_back( t4 );
@@ -1012,8 +1013,6 @@ step7:
               }
 
               // Select t6 such that a valid tour is created
-//              bool betweenT3T1 = between_( t3, t1, t5, tour, position );
-//                cerr << "type 1 " << t5 << " " << next_( t5, tour, position ) << " " << previous_( t5, tour, position ) << endl;
               size_t t6 = between_( t2, t4, t5, position ) ? next_( t5, tour, position ) : previous_( t5, tour, position );
               if ( t6 == t1 ) {
                 continue;
@@ -1022,8 +1021,8 @@ step7:
               double gain = g1 + g2 + g3;
               if ( gain > G ) {
                 G = gain;
-//                cerr << "set gain1 " << position[ t1 ] << " " << position[ t2] << endl;
-                bestTs.resize( 1 );
+                bestTs.clear();
+                bestTs.push_back( t1 );
                 bestTs.push_back( t2 );
                 bestTs.push_back( t3 );
                 bestTs.push_back( t4 );
@@ -1033,7 +1032,7 @@ step7:
             }
 
             // Second choice of t4
-            continue;
+//            continue;
 
             t4 = t2choice == 0 ? previous_( t3, tour, position ) : next_( t3, tour, position );
             for ( size_t t5index = 0; t5index < nearestNeighbors[ t4 ].size(); ++t5index ) {
@@ -1051,7 +1050,8 @@ step7:
               }
               for ( size_t t6choice = 0; t6choice < 2; ++t6choice ) {
                 size_t t6 = t6choice == 0 ? next_( t5, tour, position ) : previous_( t5, tour, position );
-                if ( t6 == t3 || t6 == t2 ) {
+                t6 = t2choice == 0 ? next_( t5, tour, position ) : previous_( t5, tour, position );
+                if ( t6 == t3 || t6 == t2 || t6 == t1 ) {
                   continue;
                 }
                 if ( t6 == previous_( t1, tour, position ) || t6 == next_( t1, tour, position ) ||
@@ -1068,13 +1068,13 @@ step7:
                 double gain = g1 + g2 + g3;
                 if ( gain > G ) {
                   G = gain;
-//                  cerr << "set gain2 " << position[t1] << " " << position[t2] << endl;
-                  bestTs.resize( 1 );
-                  bestTs.push_back( t2 );
-                  bestTs.push_back( t5 );
-                  bestTs.push_back( t6 );
+                  bestTs.clear();
                   bestTs.push_back( t3 );
                   bestTs.push_back( t4 );
+                  bestTs.push_back( t5 );
+                  bestTs.push_back( t6 );
+                  bestTs.push_back( t1 );
+                  bestTs.push_back( t2 );
                 }
               }
             }
@@ -1255,13 +1255,13 @@ step7:
 
           for ( size_t t5 = next_( t2, tour, position ); between_( t2, t3, t5, position ); t5 = next_( t5, tour, position  ) ) {
             size_t t6 = next_( t5, tour, position );
-            if ( t6 == t3 ) {
+            if ( t6 == t3 || t6 == t4 ) {
               continue;
             }
 
             for ( size_t t7 = next_( t4, tour, position ); between_( t4, t1, t7, position ); t7 = next_( t7, tour, position  ) ) {
               size_t t8 = next_( t7, tour, position );
-              if ( t8 == t1 ) {
+              if ( t8 == t1 || t8 == t2 ) {
                 continue;
               }
 
@@ -1316,14 +1316,14 @@ step7:
       vector< double > f( distances.size(), 0.0 );
       vector< double > g( distances.size(), 0.0 );
       size_t last = tour.back();
-      for ( size_t iPosition = 2; iPosition + 1 < distances.size(); ++iPosition ) {
+      for ( size_t iPosition = 1; iPosition + 2 < distances.size(); ++iPosition ) {
         size_t i = tour[ iPosition ];
         f[ i ] = doubleBridgeGain_( i, last, tour, position, distances );
       }
-      vector< size_t > maxFJ( distances.size(), distances.size() - 2 );
-      for ( size_t jPosition = distances.size() - 2; jPosition >= 3; --jPosition ) {
+      vector< size_t > maxFJ( distances.size(), distances.size() );
+      for ( size_t jPosition = distances.size() - 2; jPosition >= 2; --jPosition ) {
         const size_t j = tour[ jPosition ];
-        for ( size_t iPosition = 2; iPosition < jPosition; ++iPosition ) {
+        for ( size_t iPosition = 1; iPosition < jPosition; ++iPosition ) {
           const size_t i = tour[ iPosition ];
           double gain = doubleBridgeGain_( i, j, tour, position, distances );
           if ( gain > f[ i ] ) {
@@ -1333,7 +1333,7 @@ step7:
         }
         double fMax = numeric_limits< double >::min();
         size_t fMaxInd = 0;
-        for ( size_t iPosition = jPosition - 2; iPosition >= 1; --iPosition ) {
+        for ( int iPosition = jPosition - 2; iPosition >= 0; --iPosition ) {
           const size_t i = tour[ iPosition ];
           if ( f[ i + 1 ] > fMax ) {
             fMax = f[ i + 1 ];
@@ -1414,7 +1414,7 @@ step7:
 
     if ( true ) {
       double start( clock() );
-      computeDoubleBridgeTour2_( tour, distances, nearestNeighbors );
+      computeDoubleBridgeTour_( tour, distances, nearestNeighbors );
       compute3OptTour_( tour, distances, nearestNeighbors );
       double time( ( clock() - start ) / CLOCKS_PER_SEC );
       cerr << "4-opt tour distance: " << getLength_( tour, distances ) << ", time: " << time << endl;
