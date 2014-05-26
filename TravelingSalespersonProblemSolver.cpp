@@ -1288,6 +1288,70 @@ step7:
       }
     }
   }
+
+  double doubleBridgeGain_( size_t i, size_t j, const vector< size_t >& tour, const vector< size_t >& position, const vector< vector< double > >& distances )
+  {
+    size_t nextI = next_( i, tour, position );
+    size_t nextJ = next_( j, tour, position );
+    return distances[ i ][ nextI ] + distances[ j ][ nextJ ] - distances[ i ][ nextJ ] - distances[ j ][ nextI ];
+  }
+
+  void computeDoubleBridgeTour2_( vector< size_t >& tour,
+                                 const vector< vector< double > >& distances,
+                                 const vector< vector< size_t > >& nearestNeighbors )
+  {
+    if ( tour.size() < 8 ) {
+      return;
+    }
+    double eps = 1e-9;
+    bool changed = true;
+    vector< size_t > bestTs;
+    while ( changed ) {
+      double maxGain = 0.0;
+      changed = false;
+      vector< size_t > position( tour.size() );
+      for ( size_t i = 0; i < tour.size(); ++i ) {
+        position[ tour[ i ] ] = i;
+      }
+      vector< double > f( distances.size(), 0.0 );
+      vector< double > g( distances.size(), 0.0 );
+      size_t last = tour.back();
+      for ( size_t iPosition = 2; iPosition + 1 < distances.size(); ++iPosition ) {
+        size_t i = tour[ iPosition ];
+        f[ i ] = doubleBridgeGain_( i, last, tour, position, distances );
+      }
+      vector< size_t > maxFJ( distances.size(), distances.size() - 2 );
+      for ( size_t jPosition = distances.size() - 2; jPosition >= 3; --jPosition ) {
+        const size_t j = tour[ jPosition ];
+        for ( size_t iPosition = 2; iPosition < jPosition; ++iPosition ) {
+          const size_t i = tour[ iPosition ];
+          double gain = doubleBridgeGain_( i, j, tour, position, distances );
+          if ( gain > f[ i ] ) {
+            f[ i ] = gain; // f(i, j)
+            maxFJ[ i ] = j;
+          }
+        }
+        double fMax = numeric_limits< double >::min();
+        size_t fMaxInd = 0;
+        for ( size_t iPosition = jPosition - 2; iPosition >= 1; --iPosition ) {
+          const size_t i = tour[ iPosition ];
+          if ( f[ i + 1 ] > fMax ) {
+            fMax = f[ i + 1 ];
+            fMaxInd = i + 1;
+          }
+          double gain = doubleBridgeGain_( i, j, tour, position, distances ) + fMax;
+          if ( gain > maxGain ) {
+            maxGain = gain;
+            bestTs = { i, next_( i, tour, position ), j, next_( j, tour, position ), fMaxInd, next_( fMaxInd, tour, position ), maxFJ[ fMaxInd ], next_( maxFJ[ fMaxInd ], tour, position ) };
+          }
+        }
+      }
+      if ( maxGain > eps ) {
+        doubleBridgeSwap_( tour, position, bestTs[ 0 ], bestTs[ 1 ], bestTs[ 2 ], bestTs[ 3 ], bestTs[ 4 ], bestTs[ 5 ], bestTs[ 6 ], bestTs[ 7 ] );
+        changed = true;
+      }
+    }
+  }
   } // anonymous namespace
 
   vector< size_t > computeTour( const vector< vector< double > >& distances )
@@ -1350,7 +1414,7 @@ step7:
 
     if ( true ) {
       double start( clock() );
-      computeDoubleBridgeTour_( tour, distances, nearestNeighbors );
+      computeDoubleBridgeTour2_( tour, distances, nearestNeighbors );
       compute3OptTour_( tour, distances, nearestNeighbors );
       double time( ( clock() - start ) / CLOCKS_PER_SEC );
       cerr << "4-opt tour distance: " << getLength_( tour, distances ) << ", time: " << time << endl;
