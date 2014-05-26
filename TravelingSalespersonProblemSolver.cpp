@@ -972,8 +972,8 @@ step7:
     while ( changed ) {
       changed = false;
       for ( size_t t1 = 0; t1 < tour.size(); ++t1 ) {
-        bestTs.assign( 1, t1 );
         double G = 0.0;
+        bool flipMove = true;
         for ( size_t t2choice = 0; t2choice < 2; ++t2choice  ) {
           size_t t2 = t2choice == 0 ? previous_( t1, tour, position ) : next_( t1, tour, position );
           for ( size_t t3index = 0; t3index < nearestNeighbors[ t2 ].size(); ++t3index ) {
@@ -1000,6 +1000,7 @@ step7:
                 bestTs.push_back( t2 );
                 bestTs.push_back( t3 );
                 bestTs.push_back( t4 );
+                flipMove = true;
               }
             }
             for ( size_t t5index = 0; t5index < nearestNeighbors[ t4 ].size(); ++t5index ) {
@@ -1028,12 +1029,11 @@ step7:
                 bestTs.push_back( t4 );
                 bestTs.push_back( t5 );
                 bestTs.push_back( t6 );
+                flipMove = true;
               }
             }
 
             // Second choice of t4
-//            continue;
-
             t4 = t2choice == 0 ? previous_( t3, tour, position ) : next_( t3, tour, position );
             for ( size_t t5index = 0; t5index < nearestNeighbors[ t4 ].size(); ++t5index ) {
               size_t t5 = nearestNeighbors[ t4 ][ t5index ];
@@ -1050,7 +1050,6 @@ step7:
               }
               for ( size_t t6choice = 0; t6choice < 2; ++t6choice ) {
                 size_t t6 = t6choice == 0 ? next_( t5, tour, position ) : previous_( t5, tour, position );
-                t6 = t2choice == 0 ? next_( t5, tour, position ) : previous_( t5, tour, position );
                 if ( t6 == t3 || t6 == t2 || t6 == t1 ) {
                   continue;
                 }
@@ -1059,22 +1058,39 @@ step7:
                      t6 == previous_( t4, tour, position ) || t6 == next_( t4, tour, position ) ) {
                   continue;
                 }
-/*                cerr << "type 2" << endl;
-               cerr << "t2choice " << t2choice << endl;
-              cerr << "t1-5: " << t1 << " " << t2 << " " << t3 << " " << t4 << " " << t5 << " " << t6 << endl;
-              cerr << "p t1-5: " << position[ t1 ] << " " << position[ t2 ] << " " << position[ t3 ] << " " << position[ t4 ] << " " << position[ t5 ] << " " << position[ t6 ] << endl;
-              */
                 double g3 = distances[ t5 ][ t6 ] - distances[ t6 ][ t1 ];
                 double gain = g1 + g2 + g3;
                 if ( gain > G ) {
                   G = gain;
                   bestTs.clear();
-                  bestTs.push_back( t3 );
-                  bestTs.push_back( t4 );
-                  bestTs.push_back( t5 );
-                  bestTs.push_back( t6 );
-                  bestTs.push_back( t1 );
-                  bestTs.push_back( t2 );
+                  if ( t6choice == t2choice ) {
+                    bestTs.push_back( t3 );
+                    bestTs.push_back( t4 );
+                    bestTs.push_back( t5 );
+                    bestTs.push_back( t6 );
+                    bestTs.push_back( t1 );
+                    bestTs.push_back( t2 );
+                    flipMove = true;
+                  }
+                  else {
+                    if ( t2choice == 0 ) {
+                      bestTs.push_back( t1 );
+                      bestTs.push_back( t3 );
+                      bestTs.push_back( t5 );
+                      bestTs.push_back( t1 );
+                      bestTs.push_back( t3 );
+                      bestTs.push_back( t5 );
+                    }
+                    else {
+                      bestTs.push_back( t2 );
+                      bestTs.push_back( t6 );
+                      bestTs.push_back( t4 );
+                      bestTs.push_back( t2 );
+                      bestTs.push_back( t6 );
+                      bestTs.push_back( t4 );
+                    }
+                    flipMove = false;
+                  }
                 }
               }
             }
@@ -1083,7 +1099,26 @@ step7:
         if ( G > 0.0 ) {
           changed = true;
           vector< size_t > tourCopy( tour );
-          performMove_( bestTs, tour, position );
+          if ( flipMove ) {
+            performMove_( bestTs, tour, position );
+          }
+          else {
+            size_t i = 0;
+            for ( size_t t = bestTs[ 0 ]; t != bestTs[ 1 ]; t = next_( t, tourCopy, position ), ++i ) {
+              tour[ i ] = t;
+            }
+            for ( size_t t = bestTs[ 2 ]; t != bestTs[ 3 ]; t = next_( t, tourCopy, position ), ++i ) {
+              tour[ i ] = t;
+            }
+            for ( size_t t = bestTs[ 4 ]; t != bestTs[ 5 ]; t = next_( t, tourCopy, position ), ++i ) {
+              tour[ i ] = t;
+            }
+            for ( size_t i = 0; i < tour.size(); ++i ) {
+              position[ tour[ i ] ] = i;
+            }
+          }
+          assertIsTour_( tour, distances );
+
           if ( getLength_( tour, distances ) >= getLength_( tourCopy, distances ) ) {
             cerr << getLength_( tour, distances ) << " " << getLength_( tourCopy, distances ) << endl;
           }
