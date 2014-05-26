@@ -292,12 +292,11 @@ namespace TravelingSalespersonProblemSolver {
   double getHeldKarpLowerBound_( const vector< vector< double > >& distances )
   {
     double bestLength = numeric_limits< double >::min();
-    double treeLength = numeric_limits< double >::min();
     vector< double > lagrangeMultipliers( distances.size() );
     double lambda = 0.1;
     for ( size_t i = 0; i < 50; ++i ) {
       vector< size_t > vertexDegrees;
-      treeLength = compute1TreeLength_( vertexDegrees, distances, lagrangeMultipliers );
+      double treeLength = compute1TreeLength_( vertexDegrees, distances, lagrangeMultipliers );
       bestLength = max( bestLength, treeLength );
       double denominator = 0.0;
       for ( size_t j = 0; j < lagrangeMultipliers.size(); ++j ) {
@@ -1135,9 +1134,6 @@ step7:
         if ( maxGain > 0.0 ) {
           changed = true;
           performMove_( bestTs, tour, position );
-          for ( size_t i = 0; i < tour.size(); ++i ) {
-            position[ tour[ i ] ] = i;
-          }
         }
       }
     }
