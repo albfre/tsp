@@ -15,7 +15,8 @@
 
 using namespace std;
 
-namespace {
+namespace TravelingSalespersonProblemSolver {
+  namespace {
   void assertIsTour_( const vector< size_t >& tour,
                       const vector< vector< double > >& distances )
   {
@@ -30,7 +31,7 @@ namespace {
     }
   }
 
-  vector< size_t > getRandomtour_( const vector< vector< double > >& distances )
+  vector< size_t > getRandomTour_( const vector< vector< double > >& distances )
   {
     vector< size_t > tour( distances.size() );
     for ( size_t i = 0; i < distances.size(); ++i ) {
@@ -86,7 +87,7 @@ namespace {
   }
   */
 
-  vector< size_t > getNearestNeighbortour_( const vector< vector< double > >& distances )
+  vector< size_t > getNearestNeighborTour_( const vector< vector< double > >& distances )
   {
     vector< size_t > tour;
     tour.reserve( distances.size() );
@@ -317,7 +318,7 @@ namespace {
     return bestLength;
   }
 
-  double getLength_( vector< size_t > tour,
+  double getLength_( const vector< size_t >& tour,
                      const vector< vector< double > >& distances )
   {
     double distance = distances[ tour.back() ][ tour.front() ];
@@ -1291,11 +1292,8 @@ step7:
       }
     }
   }
+  } // anonymous namespace
 
-} // anonymous namespace
-
-
-namespace TravelingSalespersonProblemSolver {
   vector< size_t > computeTour( const vector< vector< double > >& distances )
   {
     assert( distances.size() > 0 );
@@ -1311,8 +1309,8 @@ namespace TravelingSalespersonProblemSolver {
         }
       }
     }
-    const vector< size_t > tourRand = getRandomtour_( distances );
-    const vector< size_t > tourNN = getNearestNeighbortour_( distances );
+    const vector< size_t > tourRand = getRandomTour_( distances );
+    const vector< size_t > tourNN = getNearestNeighborTour_( distances );
     const vector< size_t > tourGreedy = getGreedyTour_( distances );
     vector< size_t > tour( tourGreedy );
     cerr << setprecision( 8 );
@@ -1370,4 +1368,4 @@ namespace TravelingSalespersonProblemSolver {
 
     return tour;
   }
-}
+} // TravelingSalespersonProblemSolver
