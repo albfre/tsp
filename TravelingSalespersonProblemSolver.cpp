@@ -291,20 +291,20 @@ namespace TravelingSalespersonProblemSolver {
 
   double getHeldKarpLowerBound_( const vector< vector< double > >& distances )
   {
-    double bestLength = numeric_limits< double >::min();
+    double maxLength = numeric_limits< double >::min();
     vector< double > lagrangeMultipliers( distances.size() );
     double lambda = 0.1;
     for ( size_t i = 0; i < 50; ++i ) {
       vector< size_t > vertexDegrees;
       double treeLength = compute1TreeLength_( vertexDegrees, distances, lagrangeMultipliers );
-      bestLength = max( bestLength, treeLength );
+      maxLength = max( maxLength, treeLength );
       double denominator = 0.0;
       for ( size_t j = 0; j < lagrangeMultipliers.size(); ++j ) {
         double d = double( vertexDegrees[ j ] ) - 2.0;
         denominator += d * d;
       }
       if ( denominator == 0.0 ) {
-        return bestLength;
+        return maxLength;
       }
       double t = 2.0 * lambda * treeLength / denominator;
 
@@ -314,7 +314,7 @@ namespace TravelingSalespersonProblemSolver {
       lambda = 1.0 / ( 20.0 + 10 * i );
     }
 
-    return bestLength;
+    return maxLength;
   }
 
   double getLength_( const vector< size_t >& tour,
@@ -325,219 +325,6 @@ namespace TravelingSalespersonProblemSolver {
       distance += distances[ tour[ i ] ][ tour[ i + 1 ] ];
     }
     return distance;
-  }
-
-  void update3OptIntervals_( vector< size_t >& tour,
-                             size_t i1Begin, size_t i1End, bool reverseI1,
-                             size_t i2Begin, size_t i2End, bool reverseI2,
-                             size_t i3Begin, size_t i3End, bool reverseI3,
-                             const vector< vector< double > >& distances )
-  {
-    vector< size_t > tourCopy( tour );
-    size_t tourIdx = 0;
-    for ( size_t i = 0; i < 3; ++i ) {
-      size_t iBegin, iEnd;
-      bool reverse;
-      switch ( i ) {
-        case 0: iBegin = i1Begin; iEnd = i1End; reverse = reverseI1; break;
-        case 1: iBegin = i2Begin; iEnd = i2End; reverse = reverseI2; break;
-        case 2: iBegin = i3Begin; iEnd = i3End; reverse = reverseI3; break;
-        default: assert( false ); iBegin = 0; iEnd = 0; reverse = false;
-      }
-      if ( reverse ) {
-        if ( iBegin < iEnd ) {
-          iBegin += tour.size();
-        }
-        for ( size_t idx = iBegin; idx > iEnd; --idx, ++tourIdx ) {
-          tour[ tourIdx ] = tourCopy[ idx % tour.size() ];
-        }
-      }
-      else {
-        if ( iEnd < iBegin ) {
-          iEnd += tour.size();
-        }
-        for ( size_t idx = iBegin; idx < iEnd; ++idx, ++tourIdx ) {
-          tour[ tourIdx ] = tourCopy[ idx % tour.size() ];
-        }
-      }
-    }
-    if ( tourIdx != tour.size() ) {
-      cerr << tourIdx << " " << tour.size() << endl;
-    }
-    assert( tourIdx == tour.size() );
-    assert( getLength_( tour, distances ) < getLength_( tourCopy, distances ) );
-  }
-
-  bool update3Opt_( size_t i,
-                    size_t j,
-                    size_t k,
-                    vector< size_t >& tour,
-                    const vector< vector< double > >& distances )
-  {
-    // Because all combinations are tried, the order of i, j, and k doesn't matter.
-    vector< size_t > vertices( 3 );
-    vertices[ 0 ] = i; vertices[ 1 ] = j; vertices[ 2 ] = k;
-    sort( vertices.begin(), vertices.end() );
-    i = vertices[ 0 ]; j = vertices[ 1 ]; k = vertices[ 2 ];
-    assert( i < j && j < k );
-    const size_t tourI = tour[ i ];
-    const size_t iMinus1 = ( i + tour.size() - 1 ) % tour.size();
-    const size_t tourIminus1 = tour[ iMinus1 ];
-    const size_t tourJ = tour[ j ];
-    const size_t jMinus1 = ( j + tour.size() - 1 ) % tour.size();
-    const size_t tourJminus1 = tour[ jMinus1 ];
-    const size_t tourK = tour[ k ];
-    const size_t kMinus1 = ( k + tour.size() - 1 ) % tour.size();
-    const size_t tourKminus1 = tour[ kMinus1 ];
-    const double eps = 1e-9;
-    const double removedDistance = distances[ tourIminus1 ][ tourI ] +
-                                   distances[ tourJminus1 ][ tourJ ] +
-                                   distances[ tourKminus1 ][ tourK ] - eps; // subtract a little something to avoid numerical errors
-    vector< double > newDistances( 4 );
-    newDistances[ 0 ] = distances[ tourI ][ tourJ ] + distances[ tourK ][ tourJminus1 ] + distances[ tourIminus1 ][ tourKminus1 ];
-    newDistances[ 1 ] = distances[ tourJ ][ tourK ] + distances[ tourI ][ tourKminus1 ] + distances[ tourJminus1 ][ tourIminus1 ];
-    newDistances[ 2 ] = distances[ tourK ][ tourI ] + distances[ tourJ ][ tourIminus1 ] + distances[ tourKminus1 ][ tourJminus1 ];
-    newDistances[ 3 ] = distances[ tourI ][ tourKminus1 ] + distances[ tourJ ][ tourIminus1 ] + distances[ tourK ][ tourJminus1 ];
-    size_t minIndex = min_element( newDistances.begin(), newDistances.end() ) - newDistances.begin();
-    if ( newDistances[ minIndex ] < removedDistance ) {
-      switch ( minIndex ) {
-        case 0: reverse( tour.begin() + i, tour.begin() + j ); reverse( tour.begin() + i, tour.begin() + k ); break;
-        case 1: reverse( tour.begin() + i, tour.begin() + j ); reverse( tour.begin() + j, tour.begin() + k ); break;
-//        case 2: reverse( tour.begin() + i, tour.begin() + k ); crossingReverse( tour, k, i ); break;
-//        case 0: update3OptIntervals_( tour, i, j, false, k, i, false, kMinus1, jMinus1, true, distances ); break;
-//        case 1: update3OptIntervals_( tour, i, j, false, iMinus1, kMinus1, true, j, k, false, distances ); break;
-        case 2: update3OptIntervals_( tour, i, j, false, kMinus1, jMinus1, true, iMinus1, kMinus1, true, distances ); break;
-        case 3: update3OptIntervals_( tour, i, j, false, k, i, false, j, k, false, distances ); break;
-        default: assert( false );
-      }
-      return true;
-    }
-    return false;
-  }
-
-  /*
-  double getGain_( size_t i,
-                   size_t j,
-                   size_t k,
-                   vector< size_t >& tour,
-                   const vector< vector< double > >& distances )
-  {
-    vector< size_t > vertices( 3 );
-    vertices[ 0 ] = i; vertices[ 1 ] = j; vertices[ 2 ] = k;
-    sort( vertices.begin(), vertices.end() );
-    i = vertices[ 0 ]; j = vertices[ 1 ]; k = vertices[ 2 ];
-    assert( i < j && j < k );
-    const size_t tourI = tour[ i ];
-    const size_t iMinus1 = ( i + tour.size() - 1 ) % tour.size();
-    const size_t tourIminus1 = tour[ iMinus1 ];
-    const size_t tourJ = tour[ j ];
-    const size_t jMinus1 = ( j + tour.size() - 1 ) % tour.size();
-    const size_t tourJminus1 = tour[ jMinus1 ];
-    const size_t tourK = tour[ k ];
-    const size_t kMinus1 = ( k + tour.size() - 1 ) % tour.size();
-    const size_t tourKminus1 = tour[ kMinus1 ];
-    const double eps = 1e-9;
-    const double removedDistance = distances[ tourIminus1 ][ tourI ] +
-                                   distances[ tourJminus1 ][ tourJ ] +
-                                   distances[ tourKminus1 ][ tourK ] - eps; // subtract a little something to avoid numerical errors
-    vector< double > newDistances( 4 );
-    newDistances[ 0 ] = distances[ tourI ][ tourJ ] + distances[ tourK ][ tourJminus1 ] + distances[ tourIminus1 ][ tourKminus1 ];
-    newDistances[ 1 ] = distances[ tourJ ][ tourK ] + distances[ tourI ][ tourKminus1 ] + distances[ tourJminus1 ][ tourIminus1 ];
-    newDistances[ 2 ] = distances[ tourK ][ tourI ] + distances[ tourJ ][ tourIminus1 ] + distances[ tourKminus1 ][ tourJminus1 ];
-    newDistances[ 3 ] = distances[ tourI ][ tourKminus1 ] + distances[ tourJ ][ tourIminus1 ] + distances[ tourK ][ tourJminus1 ];
-    size_t minIndex = min_element( newDistances.begin(), newDistances.end() ) - newDistances.begin();
-    return removedDistance - newDistances[ minIndex ];
-  }
-
-  void compute3OptTour2_( vector< size_t >& tour,
-                         const vector< vector< double > >& distances,
-                         const vector< vector< size_t > >& nearestNeighbors )
-  {
-    vector< size_t > position( tour.size() );
-    for ( size_t i = 0; i < tour.size(); ++i ) {
-      position[ tour[ i ] ] = i;
-    }
-    bool changed = true;
-    while ( changed ) {
-      changed = false;
-      for ( size_t i = 0; i < tour.size(); ++i ) {
-        for ( vector< size_t >::const_iterator jIt = nearestNeighbors[ i ].begin(); jIt != nearestNeighbors[ i ].end(); ++jIt ) {
-          size_t bestI = 0;
-          size_t bestJ = 0;
-          size_t bestK = 0;
-          double bestGain = 0.0;
-          size_t numGains = 0;
-
-          size_t indexOfIIntour = position[ i ];
-          size_t indexOfJIntour = position[ *jIt ];
-          assert( indexOfJIntour != indexOfIIntour );
-          for ( vector< size_t >::const_iterator kIt = nearestNeighbors[ *jIt ].begin(); kIt != nearestNeighbors[ *jIt ].end(); ++kIt ) {
-            size_t indexOfKIntour = position[ *kIt ];
-            assert( indexOfKIntour != indexOfJIntour );
-            if ( indexOfKIntour == indexOfIIntour ) {
-              continue;
-            }
-            double gain = getGain_( indexOfIIntour, indexOfJIntour, indexOfKIntour, tour, distances ) ;
-            if ( gain > 0 ) {
-              ++numGains;
-            }
-            if ( gain > bestGain ) {
-              bestGain = gain;
-              bestI = indexOfIIntour;
-              bestJ = indexOfJIntour;
-              bestK = indexOfKIntour;
-              changed = true;
-            }
-            if ( numGains >= 8 ) {
-              break;
-            }
-          }
-          if ( bestGain > 0.0 ) {
-            assert( update3Opt_( bestI, bestJ, bestK, tour, distances ) );
-            for ( size_t pi = 0; pi < tour.size(); ++pi ) {
-              position[ tour[ pi ] ] = pi;
-            }
-            break;
-          }
-        }
-      }
-    }
-  }
-  */
-
-  void compute3OptTourOld_( vector< size_t >& tour,
-                            const vector< vector< double > >& distances,
-                            const vector< vector< size_t > >& nearestNeighbors )
-  {
-    vector< size_t > position( tour.size() );
-    for ( size_t i = 0; i < tour.size(); ++i ) {
-      position[ tour[ i ] ] = i;
-    }
-    bool changed = true;
-    while ( changed ) {
-      changed = false;
-      for ( size_t i = 0; i < tour.size(); ++i ) {
-        for ( vector< size_t >::const_iterator jIt = nearestNeighbors[ i ].begin(); jIt != nearestNeighbors[ i ].end(); ++jIt ) {
-          size_t indexOfIIntour = position[ i ];
-          size_t indexOfJIntour = position[ *jIt ];
-          assert( indexOfJIntour != indexOfIIntour );
-          for ( vector< size_t >::const_iterator kIt = nearestNeighbors[ *jIt ].begin(); kIt != nearestNeighbors[ *jIt ].end(); ++kIt ) {
-            size_t indexOfKIntour = position[ *kIt ];
-            assert( indexOfKIntour != indexOfJIntour );
-            if ( indexOfKIntour == indexOfIIntour ) {
-              continue;
-            }
-            if ( update3Opt_( indexOfIIntour, indexOfJIntour, indexOfKIntour, tour, distances ) ) {
-              changed = true;
-              for ( size_t i = 0; i < tour.size(); ++i ) {
-                position[ tour[ i ] ] = i;
-              }
-              break;
-            }
-          }
-        }
-      }
-    }
   }
 
   bool update5Opt_( size_t i,
@@ -973,7 +760,6 @@ step7:
       changed = false;
       for ( size_t t1 = 0; t1 < tour.size(); ++t1 ) {
         double G = 0.0;
-        bool flipMove = true;
         for ( size_t t2choice = 0; t2choice < 2; ++t2choice  ) {
           size_t t2 = t2choice == 0 ? previous_( t1, tour, position ) : next_( t1, tour, position );
           for ( size_t t3index = 0; t3index < nearestNeighbors[ t2 ].size(); ++t3index ) {
@@ -995,12 +781,7 @@ step7:
               double gain = g1 + distances[ t3 ][ t4 ] - distances[ t4 ][ t1 ];
               if ( gain > G ) {
                 G = gain;
-                bestTs.clear();
-                bestTs.push_back( t1 );
-                bestTs.push_back( t2 );
-                bestTs.push_back( t3 );
-                bestTs.push_back( t4 );
-                flipMove = true;
+                bestTs = { t1, t2, t3, t4 };
               }
             }
             for ( size_t t5index = 0; t5index < nearestNeighbors[ t4 ].size(); ++t5index ) {
@@ -1022,14 +803,7 @@ step7:
               double gain = g1 + g2 + g3;
               if ( gain > G ) {
                 G = gain;
-                bestTs.clear();
-                bestTs.push_back( t1 );
-                bestTs.push_back( t2 );
-                bestTs.push_back( t3 );
-                bestTs.push_back( t4 );
-                bestTs.push_back( t5 );
-                bestTs.push_back( t6 );
-                flipMove = true;
+                bestTs = { t1, t2, t3, t4, t5, t6 };
               }
             }
 
@@ -1048,50 +822,17 @@ step7:
               if ( g1 + g2 <= 0.0 ) {
                 continue;
               }
-              for ( size_t t6choice = 0; t6choice < 2; ++t6choice ) {
-                size_t t6 = t6choice == 0 ? next_( t5, tour, position ) : previous_( t5, tour, position );
-                if ( t6 == t3 || t6 == t2 || t6 == t1 ) {
-                  continue;
-                }
-                if ( t6 == previous_( t1, tour, position ) || t6 == next_( t1, tour, position ) ||
-                     t6 == previous_( t2, tour, position ) || t6 == next_( t2, tour, position ) ||
-                     t6 == previous_( t4, tour, position ) || t6 == next_( t4, tour, position ) ) {
-                  continue;
-                }
-                double g3 = distances[ t5 ][ t6 ] - distances[ t6 ][ t1 ];
-                double gain = g1 + g2 + g3;
-                if ( gain > G ) {
-                  G = gain;
-                  bestTs.clear();
-                  if ( t6choice == t2choice ) {
-                    bestTs.push_back( t3 );
-                    bestTs.push_back( t4 );
-                    bestTs.push_back( t5 );
-                    bestTs.push_back( t6 );
-                    bestTs.push_back( t1 );
-                    bestTs.push_back( t2 );
-                    flipMove = true;
-                  }
-                  else {
-                    if ( t2choice == 0 ) {
-                      bestTs.push_back( t1 );
-                      bestTs.push_back( t3 );
-                      bestTs.push_back( t5 );
-                      bestTs.push_back( t1 );
-                      bestTs.push_back( t3 );
-                      bestTs.push_back( t5 );
-                    }
-                    else {
-                      bestTs.push_back( t2 );
-                      bestTs.push_back( t6 );
-                      bestTs.push_back( t4 );
-                      bestTs.push_back( t2 );
-                      bestTs.push_back( t6 );
-                      bestTs.push_back( t4 );
-                    }
-                    flipMove = false;
-                  }
-                }
+              // Only consider one choice of t6. The other choice is possible, but clutters the code and doesn't lead to a significant improvement.
+              size_t t6choice = t2choice;
+              size_t t6 = t6choice == 0 ? next_( t5, tour, position ) : previous_( t5, tour, position );
+              if ( t6 == t3 || t6 == t2 || t6 == t1 ) {
+                continue;
+              }
+              double g3 = distances[ t5 ][ t6 ] - distances[ t6 ][ t1 ];
+              double gain = g1 + g2 + g3;
+              if ( gain > G ) {
+                G = gain;
+                bestTs = { t3, t4, t5, t6, t1, t2 };
               }
             }
           }
@@ -1099,26 +840,7 @@ step7:
         if ( G > 0.0 ) {
           changed = true;
           vector< size_t > tourCopy( tour );
-          if ( flipMove ) {
-            performMove_( bestTs, tour, position );
-          }
-          else {
-            size_t i = 0;
-            for ( size_t t = bestTs[ 0 ]; t != bestTs[ 1 ]; t = next_( t, tourCopy, position ), ++i ) {
-              tour[ i ] = t;
-            }
-            for ( size_t t = bestTs[ 2 ]; t != bestTs[ 3 ]; t = next_( t, tourCopy, position ), ++i ) {
-              tour[ i ] = t;
-            }
-            for ( size_t t = bestTs[ 4 ]; t != bestTs[ 5 ]; t = next_( t, tourCopy, position ), ++i ) {
-              tour[ i ] = t;
-            }
-            for ( size_t i = 0; i < tour.size(); ++i ) {
-              position[ tour[ i ] ] = i;
-            }
-          }
-          assertIsTour_( tour, distances );
-
+          performMove_( bestTs, tour, position );
           if ( getLength_( tour, distances ) >= getLength_( tourCopy, distances ) ) {
             cerr << getLength_( tour, distances ) << " " << getLength_( tourCopy, distances ) << endl;
           }
@@ -1172,67 +894,6 @@ step7:
         }
       }
     }
-  }
-
-  bool update2Opt_( size_t i,
-                    size_t j,
-                    vector< size_t >& tour,
-                    const vector< vector< double > >& distances )
-  {
-    assert( i < j );
-    const double eps = 1e-9;
-    const size_t t0 = tour[ i == 0 ? tour.size() - 1 : i - 1 ];
-    const size_t t1 = tour[ i ];
-    const size_t t2 = tour[ j == 0 ? tour.size() - 1 : j - 1 ];
-    const size_t t3 = tour[ j % tour.size() ];
-    if ( distances[ t0 ][ t2 ] + distances[ t1 ][ t3 ] <
-         distances[ t0 ][ t1 ] + distances[ t2 ][ t3 ] - eps ) {
-      reverse( tour.begin() + i, tour.begin() + j );
-      return true;
-    }
-    return false;
-  }
-
-  double getGain_( size_t i,
-                   size_t j,
-                   vector< size_t >& tour,
-                   const vector< vector< double > >& distances )
-  {
-    assert( i < j );
-    const double eps = 1e-9;
-    const size_t t0 = tour[ i == 0 ? tour.size() - 1 : i - 1 ];
-    const size_t t1 = tour[ i ];
-    const size_t t2 = tour[ j == 0 ? tour.size() - 1 : j - 1 ];
-    const size_t t3 = tour[ j % tour.size() ];
-    return ( distances[ t0 ][ t1 ] + distances[ t2 ][ t3 ] - ( distances[ t0 ][ t2 ] + distances[ t1 ][ t3 ] ) ) - eps;
-  }
-
-  void compute2OptTour_( vector< size_t >& tour,
-                         const vector< vector< double > >& distances )
-  {
-    bool changed = true;
-    while ( changed ) {
-      changed = false;
-      for ( size_t i = 0; i < tour.size(); ++i ) {
-        size_t bestI = (size_t)-1;
-        size_t bestJ = (size_t)-1;
-        double bestGain = 0.0;
-        // Cutting the edges of two neighboring nodes does not lead to a new tour. Hence start from i + 2.
-        for ( size_t j = i + 2; j < tour.size(); ++j ) {
-          double gain = getGain_( i, j, tour, distances ) ;
-          if ( gain > bestGain ) {
-            bestI = i;
-            bestJ = j;
-            bestGain = gain;
-            changed = true;
-          }
-        }
-        if ( bestGain > 0.0 ) {
-          assert( update2Opt_( bestI, bestJ, tour, distances ) );
-        }
-      }
-    }
-    assertIsTour_( tour, distances );
   }
 
   void doubleBridgeSwap_( vector< size_t >& tour, vector< size_t >& position, size_t t1, size_t t2, size_t t3, size_t t4, size_t t5, size_t t6, size_t t7, size_t t8 )
