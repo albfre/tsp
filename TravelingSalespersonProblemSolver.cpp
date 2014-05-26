@@ -772,15 +772,7 @@ namespace TravelingSalespersonProblemSolver {
               double gainSecondBridge = distances[ t5 ][ t6 ] + distances[ t7 ][ t8 ] - distances[ t6 ][ t7 ] - distances[ t5 ][ t8 ];
               if ( gainFirstBridge + gainSecondBridge > maxGain ) {
                 maxGain = gainFirstBridge + gainSecondBridge;
-                bestTs.clear();
-                bestTs.push_back( t1 );
-                bestTs.push_back( t2 );
-                bestTs.push_back( t3 );
-                bestTs.push_back( t4 );
-                bestTs.push_back( t5 );
-                bestTs.push_back( t6 );
-                bestTs.push_back( t7 );
-                bestTs.push_back( t8 );
+                bestTs = { t1, t2, t3, t4, t5, t6, t7, t8 };
               }
             }
           }
@@ -793,6 +785,7 @@ namespace TravelingSalespersonProblemSolver {
     }
   }
 
+  /*
   double doubleBridgeGain_( size_t i, size_t j, const vector< size_t >& tour, const vector< size_t >& position, const vector< vector< double > >& distances )
   {
     size_t nextI = next_( i, tour, position );
@@ -800,7 +793,6 @@ namespace TravelingSalespersonProblemSolver {
     return distances[ i ][ nextI ] + distances[ j ][ nextJ ] - distances[ i ][ nextJ ] - distances[ j ][ nextI ];
   }
 
-  /*
   void computeDoubleBridgeTour2_( vector< size_t >& tour,
                                  const vector< vector< double > >& distances,
                                  const vector< vector< size_t > >& nearestNeighbors )
