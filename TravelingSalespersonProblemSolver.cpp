@@ -438,198 +438,6 @@ namespace TravelingSalespersonProblemSolver {
     }
   }
 
-  bool contains_( const vector< pair< size_t, size_t > >& xs, const pair< size_t, size_t >& x )
-  {
-    for ( vector< pair< size_t, size_t > >::const_iterator it = xs.begin(); it != xs.end(); ++it ) {
-      if ( it->first == x.first && it->second == x.second ) {
-        return true;
-      }
-      if ( it->second == x.first && it->first == x.second ) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  void make2OptMove_( size_t it0, size_t it1, size_t it2, size_t it3, vector< size_t >& tour )
-  {
-    cerr << it0 << " " << it1 << " " << it2 << " " << it3 << endl;
-    assert( fabs( fabs( float( it0 ) - float( it1 ) ) - 1.0 ) < 1e-6 || fabs( fabs( float( it0 ) - float( it1 ) ) + 1.0 - float( tour.size() ) ) < 1e-6  );
-    assert( fabs( fabs( float( it2 ) - float( it3 ) ) - 1.0 ) < 1e-6 || fabs( fabs( float( it2 ) - float( it3 ) ) + 1.0 - float( tour.size() ) ) < 1e-6  );
-    size_t ind1 = max( it0, it1 );
-    size_t ind2 = max( it2, it3 );
-    if ( ind1 > ind2 ) {
-      swap( ind1, ind2 );
-    }
-    reverse( tour.begin() + ind1, tour.begin() + ind2 );
-  }
-
-  void computeLinKernighantour_( vector< size_t >& tour,
-                                 const vector< vector< double > >& distances )
-  {
-    bool changed = true;
-    vector< pair< size_t, size_t > > x;
-    vector< pair< size_t, size_t > > y;
-    vector< size_t > t;
-    const double eps = 1e-9;
-    while ( changed ) {
-      changed = false;
-restartLinKernighan:
-      // Step 2. Let ind = 0. Choose t_0
-      for ( size_t i = 1; i < tour.size(); ++i ) {
-        vector< pair< size_t, size_t > > T;
-        for ( size_t j = 0; j < tour.size(); ++j ) {
-          T.push_back( make_pair( tour[ j ], tour[ ( j + 1 ) % tour.size() ] ) );
-        }
-        size_t ind = 0;
-        x.clear();
-        y.clear();
-        t.clear();
-        t.push_back( tour[ i == 0 ? tour.size() - 1 : i - 1 ] );
-        t.push_back( tour[ i ] );
-        // Step 3. Choose x_0 = ( t_0, t_1 ) in T
-        x.push_back( make_pair( t[ 0 ], t[ 1 ] ) );
-        for ( size_t j = i + 2; j < tour.size(); ++j ) {
-          // Step 4. Choose y_0 = ( t_1, t_2 ) not in T such that G > 0
-          if ( i < 2 && j + 1 == tour.size() ) {
-            continue;
-          }
-          if ( contains_( T, make_pair( t[ 1 ], tour[ j ] ) ) ) {
-            // y is in T
-            continue;
-          }
-          double G0 = distances[ t[ 0 ] ][ t[ 1 ] ] - distances[ t[ 1 ] ][ tour[ j ] ];
-          if ( G0 <= eps ) {
-            continue;
-          }
-          double G = G0;
-
-          // Found y not in T with positive gain
-          t.push_back( tour[ j ] );
-          y.push_back( make_pair( t[ 1 ], t[ 2 ] ) ); // y_0
-
-          size_t maxKForIndEquals2 = 0;
-          bool nextYExists = true;
-          bool nextXExists = true;
-          while ( nextYExists ) {
-            // Step 5. Let ind = ind + 1
-            ++ind;
-            // Step 6. Choose x_i = (t_(2i), t_(2i+1)) in T such that
-            // (a) if t_(2i+1) is joined to t_0, the resulting configuration is a tour T'
-            // (b) x_i != y_s for all s < i
-            size_t tNext = tour[ ( ( find( tour.begin(), tour.end(), t.back() ) - tour.begin() ) + tour.size() - 1 ) % tour.size() ]; // element in tour previous to t_(2i)
-            assert( nextXExists ); // condition (b): x_i != y_s for all s < i
-            x.push_back( make_pair( t.back(), tNext ) ); // Add x_i = (t_(2i), t_(2i+1))
-            t.push_back( tNext ); // Add t_(2i+1)
-
-            cerr << ind << ". x size: " << x.size() << ", G: " << G << ", return: " << G + distances[ x.back().first ][ x.back().second ] - distances[ t.back() ][ t.front() ] << endl;
-            if ( G + distances[ x.back().first ][ x.back().second ] - distances[ t.back() ][ t.front() ] > eps ) {
-              y.push_back( make_pair( t.back(), t.front() ) );
-              changed = true;
-              // Take tour
-              vector< size_t > tourCopy( tour );
-              assert( t.size() % 2 == 0 );
-              assert( x.size() == y.size() );
-              cerr << "Take tour" << endl;
-              cerr << "x.size() " << x.size() << endl;
-              cerr << "G: " << G << " dist: " << distances[ t.back() ][ t.front() ] << endl;
-              cerr << "tour: ";
-              for ( size_t k = 0; k < tour.size(); ++k ) {
-                cerr << tour[ k ] << " ";
-              }
-              cerr << endl;
-              cerr << "x: ";
-              for ( size_t k = 0; k < x.size(); ++k ) {
-                cerr << "(" << x[ k ].first << ", " << x[ k ].second << "), ";
-              }
-              cerr << endl;
-              cerr << "y: ";
-              for ( size_t k = 0; k < y.size(); ++k ) {
-                cerr << "(" << y[ k ].first << ", " << y[ k ].second << "), ";
-              }
-              cerr << endl;
-              for ( size_t k = 1; k < x.size(); ++k ) {
-                size_t t0 = find( tour.begin(), tour.end(), x[ 0 ].first ) - tour.begin();
-                size_t t1 = find( tour.begin(), tour.end(), x[ k - 1 ].second ) - tour.begin();
-                size_t t2 = find( tour.begin(), tour.end(), x[ k ].first ) - tour.begin();
-                size_t t3 = find( tour.begin(), tour.end(), x[ k ].second ) - tour.begin();
-                cerr << "2opt: (" << x[ 0 ].first << ", " << x[ k - 1].second << "), (" << x[ k ].first << ", " << x[ k ].second << ")" << endl;
-                make2OptMove_( t0, t1, t2, t3, tour );
-              }
-              assert( tour != tourCopy );
-
-              if ( getLength_( tour, distances ) >= getLength_( tourCopy, distances ) ) {
-                cerr << setprecision( 28 ) << getLength_( tour, distances ) << " " << getLength_( tourCopy, distances ) << endl;
-              }
-              assert( getLength_( tour, distances ) < getLength_( tourCopy, distances ) );
-              goto restartLinKernighan;
-            }
-
-step7:
-            nextYExists = false;
-            // Step 7. Select y_i = (t_(2i+1), t_(2i+2)) not in T such that
-            // (a) G_i > 0
-            // (b) y_i != x_s for all s <= i
-            // (c) x_(i+1) exists
-            // If such y_i exists, go to step 5
-            size_t startK = y.size() == 1 ? maxKForIndEquals2 : 0;
-            for ( size_t k = startK; k < tour.size(); ++k ) {
-              if ( y.size() == 1 ) {
-                ++maxKForIndEquals2;
-              }
-              if ( k == i || k == j || t.back() == tour[ k ] ) {
-                continue;
-              }
-              pair< size_t, size_t > yCandidate;
-              yCandidate = make_pair( t.back(), tour[ k ] );
-
-              // y is not in T
-              if ( contains_( T, yCandidate ) ) {
-                continue;
-              }
-              // (a) G_i > 0
-              double gain = distances[ x.back().first ][ x.back().second ] - distances[ t.back() ][ tour[ k ] ];
-              if ( G + gain <= eps ) {
-                continue;
-              }
-              // (b) y_i != x_s for all s <= i
-              if ( contains_( x, yCandidate ) ) {
-                continue;
-              }
-              // (c) x_(i+1) exists
-              size_t tNextCandidate = tour[ ( ( find( tour.begin(), tour.end(), tour[ k ] ) - tour.begin() ) + tour.size() - 1 ) % tour.size() ]; // element in tour previous to t_(2i+2) candidate
-              pair< size_t, size_t > xCandidate;
-              xCandidate = make_pair( tour[ k ], tNextCandidate );
-              nextXExists = !contains_( x, xCandidate ) &&
-                            !contains_( y, xCandidate ) &&
-                            tNextCandidate != t.back();
-              if ( !nextXExists ) {
-                continue;
-              }
-              G += gain;
-              y.push_back( yCandidate );
-              t.push_back( tour[ k ] );
-
-              // Found y, goto step 5
-              nextYExists = true;
-              break;
-            }
-
-            if ( !nextYExists && maxKForIndEquals2 < tour.size() ) {
-              // Step 8. If there is an untried alternative for y_1, let i = 1 and go to Step 7
-              y.resize( 1 );
-              x.resize( 2 );
-              t.resize( 4 );
-              ind = 1;
-              G = G0;
-              goto step7;
-            }
-          }
-        }
-      }
-    }
-  }
-
   size_t previous_( size_t node, const vector< size_t >& tour, const vector< size_t >& position )
   {
     return tour[ ( position[ node ] + tour.size() - 1 ) % tour.size() ];
@@ -992,6 +800,7 @@ step7:
     return distances[ i ][ nextI ] + distances[ j ][ nextJ ] - distances[ i ][ nextJ ] - distances[ j ][ nextI ];
   }
 
+  /*
   void computeDoubleBridgeTour2_( vector< size_t >& tour,
                                  const vector< vector< double > >& distances,
                                  const vector< vector< size_t > >& nearestNeighbors )
@@ -1002,6 +811,7 @@ step7:
     double eps = 1e-9;
     bool changed = true;
     vector< size_t > bestTs;
+
     while ( changed ) {
       double maxGain = 0.0;
       changed = false;
@@ -1016,24 +826,24 @@ step7:
         size_t i = tour[ iPosition ];
         f[ i ] = doubleBridgeGain_( i, last, tour, position, distances );
       }
-      vector< size_t > maxFJ( distances.size(), distances.size() );
       for ( size_t jPosition = distances.size() - 2; jPosition >= 2; --jPosition ) {
         const size_t j = tour[ jPosition ];
-        for ( size_t iPosition = 1; iPosition < jPosition; ++iPosition ) {
-          const size_t i = tour[ iPosition ];
-          double gain = doubleBridgeGain_( i, j, tour, position, distances );
-          if ( gain > f[ i ] ) {
-            f[ i ] = gain; // f(i, j)
-            maxFJ[ i ] = j;
+        size_t maxPforJ = 0;
+        for ( size_t pPosition = 1; pPosition < jPosition; ++pPosition ) {
+          const size_t p = tour[ pPosition ];
+          double gain = doubleBridgeGain_( p, j, tour, position, distances );
+          if ( gain > f[ p ] ) {
+            f[ p ] = gain; // f(p, j)
           }
         }
-        double fMax = numeric_limits< double >::min();
-        size_t fMaxInd = 0;
+        double fMax = 0.0;
+        size_t maxIforJ = 0;
         for ( int iPosition = jPosition - 2; iPosition >= 0; --iPosition ) {
           const size_t i = tour[ iPosition ];
-          if ( f[ i + 1 ] > fMax ) {
-            fMax = f[ i + 1 ];
-            fMaxInd = i + 1;
+          const size_t nextI = next_( i, tour, position );
+          if ( f[ nextI ] > fMax ) {
+            fMax = f[ nextI ];
+            maxIforJ = nextI;
           }
           double gain = doubleBridgeGain_( i, j, tour, position, distances ) + fMax;
           if ( gain > maxGain ) {
@@ -1048,6 +858,7 @@ step7:
       }
     }
   }
+  */
   } // anonymous namespace
 
   vector< size_t > computeTour( const vector< vector< double > >& distances )
@@ -1057,6 +868,7 @@ step7:
     for ( size_t i = 0; i < distances.size(); ++i ) {
       assert( distances.size() == distances[ i ].size() );
       for ( size_t j = 0; j < distances.size(); ++j ) {
+        assert( fabs( distances[ i ][ j ] - distances[ j ][ i ] ) < 1e-9 );
         if ( i != j ) {
           assert( distances[ i ][ j ] > 0.0 );
         }
@@ -1079,8 +891,6 @@ step7:
       cerr << "Time to compute " << nearestNeighbors.front().size() << " nearest neighbors: " << time << endl;
     }
 
-    cerr << "Initial distance: " << getLength_( tour, distances ) << endl;
-    cerr << "Nearest neighbor distance: " << getLength_( tourNN, distances ) << endl;
     cerr << "Greedy distance: " << getLength_( tourGreedy, distances ) << endl;
 
     if ( true ) {
@@ -1109,7 +919,9 @@ step7:
     }
 
     if ( true ) {
+      tour = tourGreedy;
       double start( clock() );
+      compute3OptTour_( tour, distances, nearestNeighbors );
       computeDoubleBridgeTour_( tour, distances, nearestNeighbors );
       compute3OptTour_( tour, distances, nearestNeighbors );
       double time( ( clock() - start ) / CLOCKS_PER_SEC );
@@ -1118,7 +930,6 @@ step7:
     }
 
     if ( false ) {
-      computeLinKernighantour_( tour, distances );
       compute5OptTour_( tour, distances, nearestNeighbors );
     }
 
