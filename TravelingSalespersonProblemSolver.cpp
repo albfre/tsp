@@ -789,7 +789,14 @@ namespace TravelingSalespersonProblemSolver {
             cerr << "maxGain: " << maxGain << " doubleBridge " <<  doubleBridgeGain_( bestTs[ 0 ], bestTs[ 2 ], tour, position, distances ) + doubleBridgeGain_( bestTs[ 4 ], bestTs[ 6 ], tour, position, distances ) << endl;
           }
           assert( doubleBridgeGain_( bestTs[ 0 ], bestTs[ 2 ], tour, position, distances ) + doubleBridgeGain_( bestTs[ 4 ], bestTs[ 6 ], tour, position, distances ) > 0.0 );
+          vector< size_t > tourCopy( tour );
+          vector< size_t > positionCopy ( position );
           doubleBridgeSwap_( tour, position, bestTs[ 0 ], bestTs[ 1 ], bestTs[ 2 ], bestTs[ 3 ], bestTs[ 4 ], bestTs[ 5 ], bestTs[ 6 ], bestTs[ 7 ] );
+        if ( getLength_( tourCopy, distances ) < getLength_( tour, distances ) ) {
+          cerr << "doubleBridge gain " << doubleBridgeGain_( bestTs[ 0 ], bestTs[ 1 ], tourCopy, positionCopy, distances ) + doubleBridgeGain_( bestTs[ 2 ], bestTs[ 3 ], tourCopy, positionCopy, distances ) << endl;
+          cerr << " max gain " << maxGain << " " << getLength_( tourCopy, distances ) << " " << getLength_( tour, distances ) << endl;
+          assert( false );
+        }
           changed = true;
         }
       }
@@ -832,7 +839,7 @@ namespace TravelingSalespersonProblemSolver {
             q[ p ] = j + 1;
           }
         }
-        double fMax = 0.0;
+        double fMax = f[ j - 1 ];
         size_t pMax = j - 1;
         for ( int i = j - 2; i >= 0; --i ) {
           if ( f[ i + 1 ] > fMax ) {
@@ -848,16 +855,11 @@ namespace TravelingSalespersonProblemSolver {
       }
       if ( maxGain > eps ) {
         vector< size_t > tourCopy( tour );
-        vector< size_t > positionCopy( position );
         doubleBridgeSwap_( tour, position, bestTs[ 0 ], next_( bestTs[ 0 ], tour, position ),
                                            bestTs[ 1 ], next_( bestTs[ 1 ], tour, position ),
                                            bestTs[ 2 ], next_( bestTs[ 2 ], tour, position ),
                                            bestTs[ 3 ], next_( bestTs[ 3 ], tour, position ) );
-        if ( getLength_( tourCopy, distances ) < getLength_( tour, distances ) ) {
-          cerr << "doubleBridge gain " << doubleBridgeGain_( bestTs[ 0 ], bestTs[ 1 ], tourCopy, positionCopy, distances ) + doubleBridgeGain_( bestTs[ 2 ], bestTs[ 3 ], tourCopy, positionCopy, distances ) << endl;
-          cerr << " max gain " << maxGain << " " << getLength_( tourCopy, distances ) << " " << getLength_( tour, distances ) << endl;
-          assert( false );
-        }
+//        assert( getLength_( tour, distances ) < getLength_( tourCopy, distances ) );
         changed = true;
       }
     }
