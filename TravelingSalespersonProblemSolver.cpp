@@ -13,12 +13,19 @@
 /* HEADER */
 #include "TravelingSalespersonProblemSolver.h"
 
+// For profiling
+#if 0
+#define INLINE_ATTRIBUTE __attribute__ ((noinline))
+#else
+#define INLINE_ATTRIBUTE
+#endif
+
 using namespace std;
 
 namespace TravelingSalespersonProblemSolver {
   namespace {
-  void assertIsTour_( const vector< size_t >& tour,
-                      const vector< vector< double > >& distances )
+  void INLINE_ATTRIBUTE assertIsTour_( const vector< size_t >& tour,
+                                       const vector< vector< double > >& distances )
   {
     assert( tour.size() == distances.size() );
     vector< size_t > tourCopy( tour );
@@ -31,7 +38,7 @@ namespace TravelingSalespersonProblemSolver {
     }
   }
 
-  vector< size_t > getRandomTour_( const vector< vector< double > >& distances )
+  vector< size_t > INLINE_ATTRIBUTE getRandomTour_( const vector< vector< double > >& distances )
   {
     vector< size_t > tour( distances.size() );
     for ( size_t i = 0; i < distances.size(); ++i ) {
@@ -87,7 +94,7 @@ namespace TravelingSalespersonProblemSolver {
   }
   */
 
-  vector< size_t > getNearestNeighborTour_( const vector< vector< double > >& distances )
+  vector< size_t > INLINE_ATTRIBUTE getNearestNeighborTour_( const vector< vector< double > >& distances )
   {
     vector< size_t > tour;
     tour.reserve( distances.size() );
@@ -116,7 +123,7 @@ namespace TravelingSalespersonProblemSolver {
     return tour;
   }
 
-  vector< size_t > getGreedyTour_( const vector< vector< double > >& distances )
+  vector< size_t > INLINE_ATTRIBUTE getGreedyTour_( const vector< vector< double > >& distances )
   {
     // The greedy heuristic of matroid theory adds the shortest edge that neither
     // makes the degree of a vertex greater than 2 nor creates a cycle shorter than N.
@@ -181,8 +188,8 @@ namespace TravelingSalespersonProblemSolver {
     return tour;
   }
 
-  vector< vector< size_t > > computeNearestNeighbors_( const vector< vector< double > >& distances,
-                                                       size_t numberOfNeighbors )
+  vector< vector< size_t > > INLINE_ATTRIBUTE computeNearestNeighbors_( const vector< vector< double > >& distances,
+                                                                        size_t numberOfNeighbors )
   {
     numberOfNeighbors = min( numberOfNeighbors, distances.size() - 1 );
     vector< vector< size_t > > nearestNeighbors( distances.size(), vector< size_t >( numberOfNeighbors ) );
@@ -203,9 +210,9 @@ namespace TravelingSalespersonProblemSolver {
     return nearestNeighbors;
   }
 
-  double compute1TreeLength_( vector< size_t >& vertexDegrees,
-                              const vector< vector< double > >& distances,
-                              const vector< double >& lagrangeMultipliers )
+  double INLINE_ATTRIBUTE compute1TreeLength_( vector< size_t >& vertexDegrees,
+                                               const vector< vector< double > >& distances,
+                                               const vector< double >& lagrangeMultipliers )
   {
     vertexDegrees.assign( distances.size(), 0 );
 
@@ -289,7 +296,7 @@ namespace TravelingSalespersonProblemSolver {
     return treeLength - 2.0 * accumulate( lagrangeMultipliers.begin(), lagrangeMultipliers.end(), 0.0 );
   }
 
-  double getHeldKarpLowerBound_( const vector< vector< double > >& distances )
+  double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >& distances )
   {
     double maxLength = numeric_limits< double >::min();
     vector< double > lagrangeMultipliers( distances.size() );
@@ -317,7 +324,7 @@ namespace TravelingSalespersonProblemSolver {
     return maxLength;
   }
 
-  double getLength_( const vector< size_t >& tour,
+  double INLINE_ATTRIBUTE getLength_( const vector< size_t >& tour,
                      const vector< vector< double > >& distances )
   {
     double distance = distances[ tour.back() ][ tour.front() ];
@@ -327,13 +334,13 @@ namespace TravelingSalespersonProblemSolver {
     return distance;
   }
 
-  bool update5Opt_( size_t i,
-                    size_t j,
-                    size_t k,
-                    size_t l,
-                    size_t m,
-                    vector< size_t >& tour,
-                    const vector< vector< double > >& distances )
+  bool INLINE_ATTRIBUTE update5Opt_( size_t i,
+                                     size_t j,
+                                     size_t k,
+                                     size_t l,
+                                     size_t m,
+                                     vector< size_t >& tour,
+                                     const vector< vector< double > >& distances )
   {
     vector< size_t > vertices( 5 );
     vertices[ 0 ] = i; vertices[ 1 ] = j; vertices[ 2 ] = k; vertices[ 3 ] = l; vertices[ 4 ] = m;
@@ -381,9 +388,9 @@ namespace TravelingSalespersonProblemSolver {
     return false;
   }
 
-  void compute5OptTour_( vector< size_t >& tour,
-                         const vector< vector< double > >& distances,
-                         const vector< vector< size_t > >& nearestNeighbors )
+  void INLINE_ATTRIBUTE compute5OptTour_( vector< size_t >& tour,
+                                          const vector< vector< double > >& distances,
+                                          const vector< vector< size_t > >& nearestNeighbors )
   {
     vector< size_t > position( tour.size() );
     for ( size_t i = 0; i < tour.size(); ++i ) {
@@ -438,24 +445,24 @@ namespace TravelingSalespersonProblemSolver {
     }
   }
 
-  size_t previous_( size_t node, const vector< size_t >& tour, const vector< size_t >& position )
+  size_t INLINE_ATTRIBUTE previous_( size_t node, const vector< size_t >& tour, const vector< size_t >& position )
   {
     return tour[ ( position[ node ] + tour.size() - 1 ) % tour.size() ];
   }
 
-  size_t next_( size_t node, const vector< size_t >& tour, const vector< size_t >& position )
+  size_t INLINE_ATTRIBUTE next_( size_t node, const vector< size_t >& tour, const vector< size_t >& position )
   {
     return tour[ ( position[ node ] + 1 ) % tour.size() ];
   }
 
-  bool between_( size_t a, size_t b, size_t c, const vector< size_t >& position )
+  bool INLINE_ATTRIBUTE between_( size_t a, size_t b, size_t c, const vector< size_t >& position )
   {
     return ( position[ a ] <= position[ c ] && position[ c ] <= position[ b ] ) ||
            ( position[ b ] <= position[ a ] && position[ a ] <= position[ c ] ) ||
            ( position[ c ] <= position[ b ] && position[ b ] <= position[ a ] );
   }
 
-  void flip_( vector< size_t >& tour, vector< size_t >& position, size_t t1, size_t t2, size_t t3, size_t t4 )
+  void INLINE_ATTRIBUTE flip_( vector< size_t >& tour, vector< size_t >& position, size_t t1, size_t t2, size_t t3, size_t t4 )
   {
 
     if ( !( t2 == next_( t1, tour, position ) && t3 == next_( t4, tour, position ) ) ) {
@@ -487,7 +494,7 @@ namespace TravelingSalespersonProblemSolver {
     }
   }
 
-  void performMove_( const vector< size_t >& ts, vector< size_t >& tour, vector< size_t >& position )
+  void INLINE_ATTRIBUTE performMove_( const vector< size_t >& ts, vector< size_t >& tour, vector< size_t >& position )
   {
     assert( ts.size() == 4 || ts.size() == 6 );
     if ( ts.size() == 4 ) {
@@ -511,14 +518,6 @@ namespace TravelingSalespersonProblemSolver {
       size_t t5 = ts[ 4 ];
       size_t t6 = ts[ 5 ];
 
-//      cerr << "ts: " << t1 << " " << t2 << " " << t3 << " " << t4 << " " << t5 << " " << t6 << endl;
-//      cerr << "pts: " << position[t1] << " " << position[t2] << " " << position[t3] << " " << position[t4] << " " << position[t5] << " " << position[t6] << endl;
-
-//      cerr << "tour before: ";
-//      for ( size_t i = 0; i< tour.size(); ++i ) {
-//        cerr << tour[ i ] << " ";
-//      }
-//      cerr << endl;
       if ( t1 == next_( t2, tour, position ) ) {
         swap( t1, t2 );
       }
@@ -526,11 +525,6 @@ namespace TravelingSalespersonProblemSolver {
         swap( t3, t4 );
       }
       flip_( tour, position, t1, t2, t3, t4 );
-//      cerr << "tour intermediate: ";
-//      for ( size_t i = 0; i< tour.size(); ++i ) {
-//        cerr << tour[ i ] << " ";
-//      }
-//      cerr << endl;
 
       t1 = ts[ 0 ];
       t4 = ts[ 3 ];
@@ -539,8 +533,6 @@ namespace TravelingSalespersonProblemSolver {
 
       t2 = ts[ 1 ];
       t3 = ts[ 2 ];
-
-//      cerr << "pts2: " << position[t1] << " " << position[t2] << " " << position[t3] << " " << position[t4] << " " << position[t5] << " " << position[t6] << endl;
 
       if ( t1 == next_( t4, tour, position ) ) {
         swap( t1, t4 );
@@ -552,9 +544,9 @@ namespace TravelingSalespersonProblemSolver {
     }
   }
 
-  void compute3OptTour_( vector< size_t >& tour,
-                         const vector< vector< double > >& distances,
-                         const vector< vector< size_t > >& nearestNeighbors )
+  void INLINE_ATTRIBUTE compute3OptTour_( vector< size_t >& tour,
+                                          const vector< vector< double > >& distances,
+                                          const vector< vector< size_t > >& nearestNeighbors )
   {
     const double eps = 1e-9;
     vector< size_t > position( tour.size() );
@@ -575,8 +567,8 @@ namespace TravelingSalespersonProblemSolver {
             if ( t3 == previous_( t2, tour, position ) || t3 == next_( t2, tour, position ) ) {
               continue;
             }
-            double g1 = distances[ t1 ][ t2 ] - distances[ t2 ][ t3 ] - eps;
-            if ( g1 <= 0.0 ) {
+            double g1 = distances[ t1 ][ t2 ] - distances[ t2 ][ t3 ];
+            if ( g1 <= eps ) {
               continue;
             }
             // First choice of t4
@@ -598,7 +590,7 @@ namespace TravelingSalespersonProblemSolver {
                 continue;
               }
               double g2 = distances[ t3 ][ t4 ] - distances[ t4 ][ t5 ];
-              if ( g1 + g2 <= 0.0 ) {
+              if ( g1 + g2 <= eps ) {
                 continue;
               }
 
@@ -627,7 +619,7 @@ namespace TravelingSalespersonProblemSolver {
                 continue;
               }
               double g2 = distances[ t3 ][ t4 ] - distances[ t4 ][ t5 ];
-              if ( g1 + g2 <= 0.0 ) {
+              if ( g1 + g2 <= eps ) {
                 continue;
               }
               // Only consider one choice of t6. The other choice is possible, but clutters the code and doesn't lead to a significant improvement.
@@ -645,7 +637,7 @@ namespace TravelingSalespersonProblemSolver {
             }
           }
         }
-        if ( G > 0.0 ) {
+        if ( G > eps ) {
           changed = true;
           vector< size_t > tourCopy( tour );
           performMove_( bestTs, tour, position );
@@ -658,9 +650,9 @@ namespace TravelingSalespersonProblemSolver {
     }
   }
 
-  void compute2OptTour_( vector< size_t >& tour,
-                         const vector< vector< double > >& distances,
-                         const vector< vector< size_t > >& nearestNeighbors )
+  void INLINE_ATTRIBUTE compute2OptTour_( vector< size_t >& tour,
+                                          const vector< vector< double > >& distances,
+                                          const vector< vector< size_t > >& nearestNeighbors )
   {
     const double eps = 1e-9;
     vector< size_t > position( tour.size() );
@@ -686,7 +678,7 @@ namespace TravelingSalespersonProblemSolver {
               break;
             }
             size_t t4 = t2choice == 0 ? next_( t3, tour, position ) : previous_( t3, tour, position );
-            double gain = distances[ t1 ][ t2 ] + distances[ t3 ][ t4 ] - ( distances[ t1 ][ t4 ] + distances[ t2 ][ t3 ] ) - eps;
+            double gain = distances[ t1 ][ t2 ] + distances[ t3 ][ t4 ] - ( distances[ t1 ][ t4 ] + distances[ t2 ][ t3 ] );
             if ( gain > maxGain ) {
               maxGain = gain;
               bestTs[ 0 ] = t1;
@@ -696,7 +688,7 @@ namespace TravelingSalespersonProblemSolver {
             }
           }
         }
-        if ( maxGain > 0.0 ) {
+        if ( maxGain > eps ) {
           changed = true;
           performMove_( bestTs, tour, position );
         }
@@ -704,7 +696,7 @@ namespace TravelingSalespersonProblemSolver {
     }
   }
 
-  void doubleBridgeSwap_( vector< size_t >& tour, vector< size_t >& position, size_t t1, size_t t2, size_t t3, size_t t4, size_t t5, size_t t6, size_t t7, size_t t8 )
+  void INLINE_ATTRIBUTE doubleBridgeSwap_( vector< size_t >& tour, vector< size_t >& position, size_t t1, size_t t2, size_t t3, size_t t4, size_t t5, size_t t6, size_t t7, size_t t8 )
   {
     assert( t2 == next_( t1, tour, position ) && t4 == next_( t3, tour, position ) && t6 == next_( t5, tour, position ) && t8 == next_( t7, tour, position ) );
     vector< size_t > tourCopy( tour );
@@ -726,18 +718,21 @@ namespace TravelingSalespersonProblemSolver {
     }
   }
 
-  double doubleBridgeGain_( size_t i, size_t j, const vector< size_t >& tour, const vector< size_t >& position, const vector< vector< double > >& distances )
+  double INLINE_ATTRIBUTE doubleBridgeGain_( size_t i, size_t j, const vector< size_t >& tour, const vector< size_t >& position, const vector< vector< double > >& distances )
   {
     size_t nextI = next_( i, tour, position );
     size_t nextJ = next_( j, tour, position );
     return distances[ i ][ nextI ] + distances[ j ][ nextJ ] - distances[ i ][ nextJ ] - distances[ j ][ nextI ];
   }
 
-  void computeDoubleBridgeTour_( vector< size_t >& tour,
-                                 const vector< vector< double > >& distances,
-                                 const vector< vector< size_t > >& nearestNeighbors )
+  void INLINE_ATTRIBUTE computeDoubleBridgeTour_( vector< size_t >& tour,
+                                                  const vector< vector< double > >& distances,
+                                                  const vector< vector< size_t > >& nearestNeighbors )
   {
-    double eps = 1e-9;
+    if ( tour.size() < 5 ) {
+      return;
+    }
+    const double eps = 1e-9;
     vector< size_t > position( tour.size() );
     for ( size_t i = 0; i < tour.size(); ++i ) {
       position[ tour[ i ] ] = i;
@@ -753,28 +748,18 @@ namespace TravelingSalespersonProblemSolver {
         for ( size_t t3index = 0; t3index < nearestNeighbors[ t2 ].size(); ++t3index ) {
           size_t t3 = nearestNeighbors[ t2 ][ t3index ];
           size_t t4 = next_( t3, tour, position );
-          if ( t3 == t1 ||
-               t4 == t1 ||
-               t3 == next_( t2, tour, position ) ||
-               t4 == previous_( t1, tour, position ) ) {
+          if ( t3 == t1 || t4 == t1 ) {
             continue;
           }
-          double gainFirstBridge = distances[ t1 ][ t2 ] + distances[ t3 ][ t4 ] - distances[ t2 ][ t3 ] - distances[ t1 ][ t4 ] - eps;
+          double gainFirstBridge = distances[ t1 ][ t2 ] + distances[ t3 ][ t4 ] - distances[ t2 ][ t3 ] - distances[ t1 ][ t4 ];
           if ( gainFirstBridge <= 0.0 ) {
             continue;
           }
 
-          for ( size_t t5 = next_( t2, tour, position ); between_( t2, t3, t5, position ); t5 = next_( t5, tour, position  ) ) {
+          for ( size_t t5 = t2; t5 != t3; t5 = next_( t5, tour, position  ) ) {
             size_t t6 = next_( t5, tour, position );
-            if ( t6 == t3 || t6 == t4 ) {
-              continue;
-            }
-
-            for ( size_t t7 = next_( t4, tour, position ); between_( t4, t1, t7, position ); t7 = next_( t7, tour, position  ) ) {
+            for ( size_t t7 = t4; t7 != t1; t7 = next_( t7, tour, position  ) ) {
               size_t t8 = next_( t7, tour, position );
-              if ( t8 == t1 || t8 == t2 ) {
-                continue;
-              }
 
               double gainSecondBridge = distances[ t5 ][ t6 ] + distances[ t7 ][ t8 ] - distances[ t6 ][ t7 ] - distances[ t5 ][ t8 ];
               if ( gainFirstBridge + gainSecondBridge > maxGain ) {
@@ -784,19 +769,8 @@ namespace TravelingSalespersonProblemSolver {
             }
           }
         }
-        if ( maxGain > 0.0 ) {
-          if ( !( doubleBridgeGain_( bestTs[ 0 ], bestTs[ 2 ], tour, position, distances ) + doubleBridgeGain_( bestTs[ 4 ], bestTs[ 6 ], tour, position, distances ) > 0.0 ) ) {
-            cerr << "maxGain: " << maxGain << " doubleBridge " <<  doubleBridgeGain_( bestTs[ 0 ], bestTs[ 2 ], tour, position, distances ) + doubleBridgeGain_( bestTs[ 4 ], bestTs[ 6 ], tour, position, distances ) << endl;
-          }
-          assert( doubleBridgeGain_( bestTs[ 0 ], bestTs[ 2 ], tour, position, distances ) + doubleBridgeGain_( bestTs[ 4 ], bestTs[ 6 ], tour, position, distances ) > 0.0 );
-          vector< size_t > tourCopy( tour );
-          vector< size_t > positionCopy ( position );
+        if ( maxGain > eps ) {
           doubleBridgeSwap_( tour, position, bestTs[ 0 ], bestTs[ 1 ], bestTs[ 2 ], bestTs[ 3 ], bestTs[ 4 ], bestTs[ 5 ], bestTs[ 6 ], bestTs[ 7 ] );
-        if ( getLength_( tourCopy, distances ) < getLength_( tour, distances ) ) {
-          cerr << "doubleBridge gain " << doubleBridgeGain_( bestTs[ 0 ], bestTs[ 1 ], tourCopy, positionCopy, distances ) + doubleBridgeGain_( bestTs[ 2 ], bestTs[ 3 ], tourCopy, positionCopy, distances ) << endl;
-          cerr << " max gain " << maxGain << " " << getLength_( tourCopy, distances ) << " " << getLength_( tour, distances ) << endl;
-          assert( false );
-        }
           changed = true;
         }
       }
@@ -804,9 +778,9 @@ namespace TravelingSalespersonProblemSolver {
   }
 
 
-  void computeDoubleBridgeTour2_( vector< size_t >& tour,
-                                 const vector< vector< double > >& distances,
-                                 const vector< vector< size_t > >& nearestNeighbors )
+  void INLINE_ATTRIBUTE computeDoubleBridgeTour2_( vector< size_t >& tour,
+                                                   const vector< vector< double > >& distances,
+                                                   const vector< vector< size_t > >& nearestNeighbors )
   {
     if ( tour.size() < 8 ) {
       return;
@@ -814,18 +788,21 @@ namespace TravelingSalespersonProblemSolver {
     double eps = 1e-9;
     bool changed = true;
     vector< size_t > bestTs;
+    vector< size_t > position( tour.size() );
+    for ( size_t i = 0; i < tour.size(); ++i ) {
+      position[ tour[ i ] ] = i;
+    }
+    vector< double > f( distances.size(), 0.0 );
+    vector< double > g( distances.size(), 0.0 );
+    vector< size_t > q( distances.size(), distances.size() - 1 );
 
     while ( changed ) {
       double maxGain = 0.0;
       changed = false;
-      vector< size_t > position( tour.size() );
-      for ( size_t i = 0; i < tour.size(); ++i ) {
-        position[ tour[ i ] ] = i;
-      }
+      f.assign( distances.size(), 0.0 );
+      g.assign( distances.size(), 0.0 );
+      q.assign( distances.size(), distances.size() - 1 );
 
-      vector< double > f( distances.size(), 0.0 );
-      vector< double > g( distances.size(), 0.0 );
-      vector< size_t > q( distances.size(), distances.size() - 1 );
       for ( size_t p = 1; p + 2 < tour.size(); ++p ) {
         f[ p ] = doubleBridgeGain_( tour[ p ], tour[ tour.size() - 1 ], tour, position, distances );
         q[ p ] = tour.size() - 1;
@@ -859,14 +836,13 @@ namespace TravelingSalespersonProblemSolver {
                                            bestTs[ 1 ], next_( bestTs[ 1 ], tour, position ),
                                            bestTs[ 2 ], next_( bestTs[ 2 ], tour, position ),
                                            bestTs[ 3 ], next_( bestTs[ 3 ], tour, position ) );
-//        assert( getLength_( tour, distances ) < getLength_( tourCopy, distances ) );
         changed = true;
       }
     }
   }
   } // anonymous namespace
 
-  vector< size_t > computeTour( const vector< vector< double > >& distances )
+  vector< size_t > INLINE_ATTRIBUTE computeTour( const vector< vector< double > >& distances )
   {
     assert( distances.size() > 0 );
     srand( 1729 );
@@ -883,7 +859,7 @@ namespace TravelingSalespersonProblemSolver {
       }
     }
     const vector< size_t > tourRand = getRandomTour_( distances );
-    const vector< size_t > tourNN = getNearestNeighborTour_( distances );
+//    const vector< size_t > tourNN = getNearestNeighborTour_( distances );
     const vector< size_t > tourGreedy = getGreedyTour_( distances );
     vector< size_t > tour( tourGreedy );
     cerr << setprecision( 8 );
@@ -927,7 +903,7 @@ namespace TravelingSalespersonProblemSolver {
       tour = tourGreedy;
       double start( clock() );
       compute3OptTour_( tour, distances, nearestNeighbors );
-      computeDoubleBridgeTour2_( tour, distances, nearestNeighbors );
+      computeDoubleBridgeTour_( tour, distances, nearestNeighbors );
       compute3OptTour_( tour, distances, nearestNeighbors );
       double time( ( clock() - start ) / CLOCKS_PER_SEC );
       cerr << "4-opt tour distance: " << getLength_( tour, distances ) << ", time: " << time << endl;
