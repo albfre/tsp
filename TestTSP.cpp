@@ -90,7 +90,6 @@ void testTSPRandom( size_t numOfPoints )
 int main( int argc, const char* argv[] )
 {
   bool standardTest = argc == 1;
-
   if ( standardTest ) {
     testTSPRandom( 50 );
   }

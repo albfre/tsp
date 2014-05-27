@@ -726,6 +726,13 @@ namespace TravelingSalespersonProblemSolver {
     }
   }
 
+  double doubleBridgeGain_( size_t i, size_t j, const vector< size_t >& tour, const vector< size_t >& position, const vector< vector< double > >& distances )
+  {
+    size_t nextI = next_( i, tour, position );
+    size_t nextJ = next_( j, tour, position );
+    return distances[ i ][ nextI ] + distances[ j ][ nextJ ] - distances[ i ][ nextJ ] - distances[ j ][ nextI ];
+  }
+
   void computeDoubleBridgeTour_( vector< size_t >& tour,
                                  const vector< vector< double > >& distances,
                                  const vector< vector< size_t > >& nearestNeighbors )
@@ -778,6 +785,10 @@ namespace TravelingSalespersonProblemSolver {
           }
         }
         if ( maxGain > 0.0 ) {
+          if ( !( doubleBridgeGain_( bestTs[ 0 ], bestTs[ 2 ], tour, position, distances ) + doubleBridgeGain_( bestTs[ 4 ], bestTs[ 6 ], tour, position, distances ) > 0.0 ) ) {
+            cerr << "maxGain: " << maxGain << " doubleBridge " <<  doubleBridgeGain_( bestTs[ 0 ], bestTs[ 2 ], tour, position, distances ) + doubleBridgeGain_( bestTs[ 4 ], bestTs[ 6 ], tour, position, distances ) << endl;
+          }
+          assert( doubleBridgeGain_( bestTs[ 0 ], bestTs[ 2 ], tour, position, distances ) + doubleBridgeGain_( bestTs[ 4 ], bestTs[ 6 ], tour, position, distances ) > 0.0 );
           doubleBridgeSwap_( tour, position, bestTs[ 0 ], bestTs[ 1 ], bestTs[ 2 ], bestTs[ 3 ], bestTs[ 4 ], bestTs[ 5 ], bestTs[ 6 ], bestTs[ 7 ] );
           changed = true;
         }
@@ -785,13 +796,6 @@ namespace TravelingSalespersonProblemSolver {
     }
   }
 
-  /*
-  double doubleBridgeGain_( size_t i, size_t j, const vector< size_t >& tour, const vector< size_t >& position, const vector< vector< double > >& distances )
-  {
-    size_t nextI = next_( i, tour, position );
-    size_t nextJ = next_( j, tour, position );
-    return distances[ i ][ nextI ] + distances[ j ][ nextJ ] - distances[ i ][ nextJ ] - distances[ j ][ nextI ];
-  }
 
   void computeDoubleBridgeTour2_( vector< size_t >& tour,
                                  const vector< vector< double > >& distances,
@@ -811,46 +815,53 @@ namespace TravelingSalespersonProblemSolver {
       for ( size_t i = 0; i < tour.size(); ++i ) {
         position[ tour[ i ] ] = i;
       }
+
       vector< double > f( distances.size(), 0.0 );
       vector< double > g( distances.size(), 0.0 );
-      size_t last = tour.back();
-      for ( size_t iPosition = 1; iPosition + 2 < distances.size(); ++iPosition ) {
-        size_t i = tour[ iPosition ];
-        f[ i ] = doubleBridgeGain_( i, last, tour, position, distances );
+      vector< size_t > q( distances.size(), distances.size() - 1 );
+      for ( size_t p = 1; p + 2 < tour.size(); ++p ) {
+        f[ p ] = doubleBridgeGain_( tour[ p ], tour[ tour.size() - 1 ], tour, position, distances );
+        q[ p ] = tour.size() - 1;
       }
-      for ( size_t jPosition = distances.size() - 2; jPosition >= 2; --jPosition ) {
-        const size_t j = tour[ jPosition ];
-        size_t maxPforJ = 0;
-        for ( size_t pPosition = 1; pPosition < jPosition; ++pPosition ) {
-          const size_t p = tour[ pPosition ];
-          double gain = doubleBridgeGain_( p, j, tour, position, distances );
+
+      for ( size_t j = tour.size() - 2; j > 1; --j ) {
+        for ( size_t p = 1; p < j; ++p ) {
+          double gain = doubleBridgeGain_( tour[ p ], tour[ j + 1 ], tour, position, distances );
           if ( gain > f[ p ] ) {
-            f[ p ] = gain; // f(p, j)
+            f[ p ] = gain;
+            q[ p ] = j + 1;
           }
         }
         double fMax = 0.0;
-        size_t maxIforJ = 0;
-        for ( int iPosition = jPosition - 2; iPosition >= 0; --iPosition ) {
-          const size_t i = tour[ iPosition ];
-          const size_t nextI = next_( i, tour, position );
-          if ( f[ nextI ] > fMax ) {
-            fMax = f[ nextI ];
-            maxIforJ = nextI;
+        size_t pMax = j - 1;
+        for ( int i = j - 2; i >= 0; --i ) {
+          if ( f[ i + 1 ] > fMax ) {
+            fMax = f[ i + 1 ];
+            pMax = size_t( i + 1 );
           }
-          double gain = doubleBridgeGain_( i, j, tour, position, distances ) + fMax;
-          if ( gain > maxGain ) {
-            maxGain = gain;
-            bestTs = { i, next_( i, tour, position ), j, next_( j, tour, position ), fMaxInd, next_( fMaxInd, tour, position ), maxFJ[ fMaxInd ], next_( maxFJ[ fMaxInd ], tour, position ) };
+          double gain = doubleBridgeGain_( tour[ i ], tour[ j ], tour, position, distances );
+          if ( gain + fMax > maxGain ) {
+            maxGain = gain + fMax;
+            bestTs = { tour[ i ], tour[ j ], tour[ pMax ], tour[ q[ pMax ] ] };
           }
         }
       }
       if ( maxGain > eps ) {
-        doubleBridgeSwap_( tour, position, bestTs[ 0 ], bestTs[ 1 ], bestTs[ 2 ], bestTs[ 3 ], bestTs[ 4 ], bestTs[ 5 ], bestTs[ 6 ], bestTs[ 7 ] );
+        vector< size_t > tourCopy( tour );
+        vector< size_t > positionCopy( position );
+        doubleBridgeSwap_( tour, position, bestTs[ 0 ], next_( bestTs[ 0 ], tour, position ),
+                                           bestTs[ 1 ], next_( bestTs[ 1 ], tour, position ),
+                                           bestTs[ 2 ], next_( bestTs[ 2 ], tour, position ),
+                                           bestTs[ 3 ], next_( bestTs[ 3 ], tour, position ) );
+        if ( getLength_( tourCopy, distances ) < getLength_( tour, distances ) ) {
+          cerr << "doubleBridge gain " << doubleBridgeGain_( bestTs[ 0 ], bestTs[ 1 ], tourCopy, positionCopy, distances ) + doubleBridgeGain_( bestTs[ 2 ], bestTs[ 3 ], tourCopy, positionCopy, distances ) << endl;
+          cerr << " max gain " << maxGain << " " << getLength_( tourCopy, distances ) << " " << getLength_( tour, distances ) << endl;
+          assert( false );
+        }
         changed = true;
       }
     }
   }
-  */
   } // anonymous namespace
 
   vector< size_t > computeTour( const vector< vector< double > >& distances )
@@ -914,7 +925,7 @@ namespace TravelingSalespersonProblemSolver {
       tour = tourGreedy;
       double start( clock() );
       compute3OptTour_( tour, distances, nearestNeighbors );
-      computeDoubleBridgeTour_( tour, distances, nearestNeighbors );
+      computeDoubleBridgeTour2_( tour, distances, nearestNeighbors );
       compute3OptTour_( tour, distances, nearestNeighbors );
       double time( ( clock() - start ) / CLOCKS_PER_SEC );
       cerr << "4-opt tour distance: " << getLength_( tour, distances ) << ", time: " << time << endl;
