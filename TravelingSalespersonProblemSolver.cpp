@@ -713,13 +713,6 @@ namespace TravelingSalespersonProblemSolver {
     }
   }
 
-  double INLINE_ATTRIBUTE doubleBridgeGain_( size_t i, size_t j, const vector< size_t >& tour, const vector< size_t >& position, const vector< vector< double > >& distances )
-  {
-    size_t nextI = next_( i, tour, position );
-    size_t nextJ = next_( j, tour, position );
-    return distances[ i ][ nextI ] + distances[ j ][ nextJ ] - distances[ i ][ nextJ ] - distances[ j ][ nextI ];
-  }
-
   void INLINE_ATTRIBUTE computeDoubleBridgeTour_( vector< size_t >& tour,
                                                   const vector< vector< double > >& distances,
                                                   const vector< vector< size_t > >& nearestNeighbors )
@@ -758,6 +751,7 @@ namespace TravelingSalespersonProblemSolver {
               if ( !between_( t4, t1, t7, position ) || t7 == t1 ) {
                 continue;
               }
+              size_t t8 = next_( t7, tour, position );
 
               double gainSecondBridge = distances[ t5 ][ t6 ] + distances[ t7 ][ t8 ] - distances[ t6 ][ t7 ] - distances[ t5 ][ t8 ];
               if ( gainFirstBridge + gainSecondBridge > maxGain ) {
@@ -771,70 +765,6 @@ namespace TravelingSalespersonProblemSolver {
           doubleBridgeSwap_( tour, position, bestTs[ 0 ], bestTs[ 1 ], bestTs[ 2 ], bestTs[ 3 ], bestTs[ 4 ], bestTs[ 5 ], bestTs[ 6 ], bestTs[ 7 ] );
           changed = true;
         }
-      }
-    }
-  }
-
-
-  void INLINE_ATTRIBUTE computeDoubleBridgeTour2_( vector< size_t >& tour,
-                                                   const vector< vector< double > >& distances,
-                                                   const vector< vector< size_t > >& nearestNeighbors )
-  {
-    if ( tour.size() < 8 ) {
-      return;
-    }
-    double eps = 1e-9;
-    bool changed = true;
-    vector< size_t > bestTs;
-    vector< size_t > position( tour.size() );
-    for ( size_t i = 0; i < tour.size(); ++i ) {
-      position[ tour[ i ] ] = i;
-    }
-    vector< double > f( distances.size(), 0.0 );
-    vector< double > g( distances.size(), 0.0 );
-    vector< size_t > q( distances.size(), distances.size() - 1 );
-
-    while ( changed ) {
-      double maxGain = 0.0;
-      changed = false;
-      f.assign( distances.size(), 0.0 );
-      g.assign( distances.size(), 0.0 );
-      q.assign( distances.size(), distances.size() - 1 );
-
-      for ( size_t p = 1; p + 2 < tour.size(); ++p ) {
-        f[ p ] = doubleBridgeGain_( tour[ p ], tour[ tour.size() - 1 ], tour, position, distances );
-        q[ p ] = tour.size() - 1;
-      }
-
-      for ( size_t j = tour.size() - 2; j > 1; --j ) {
-        for ( size_t p = 1; p < j; ++p ) {
-          double gain = doubleBridgeGain_( tour[ p ], tour[ j + 1 ], tour, position, distances );
-          if ( gain > f[ p ] ) {
-            f[ p ] = gain;
-            q[ p ] = j + 1;
-          }
-        }
-        double fMax = f[ j - 1 ];
-        size_t pMax = j - 1;
-        for ( int i = j - 2; i >= 0; --i ) {
-          if ( f[ i + 1 ] > fMax ) {
-            fMax = f[ i + 1 ];
-            pMax = size_t( i + 1 );
-          }
-          double gain = doubleBridgeGain_( tour[ i ], tour[ j ], tour, position, distances );
-          if ( gain + fMax > maxGain ) {
-            maxGain = gain + fMax;
-            bestTs = { tour[ i ], tour[ j ], tour[ pMax ], tour[ q[ pMax ] ] };
-          }
-        }
-      }
-      if ( maxGain > eps ) {
-        vector< size_t > tourCopy( tour );
-        doubleBridgeSwap_( tour, position, bestTs[ 0 ], next_( bestTs[ 0 ], tour, position ),
-                                           bestTs[ 1 ], next_( bestTs[ 1 ], tour, position ),
-                                           bestTs[ 2 ], next_( bestTs[ 2 ], tour, position ),
-                                           bestTs[ 3 ], next_( bestTs[ 3 ], tour, position ) );
-        changed = true;
       }
     }
   }
@@ -857,7 +787,7 @@ namespace TravelingSalespersonProblemSolver {
       }
     }
     const vector< size_t > tourRand = getRandomTour_( distances );
-//    const vector< size_t > tourNN = getNearestNeighborTour_( distances );
+    const vector< size_t > tourNN = getNearestNeighborTour_( distances );
     const vector< size_t > tourGreedy = getGreedyTour_( distances );
     vector< size_t > tour( tourGreedy );
     cerr << setprecision( 8 );
