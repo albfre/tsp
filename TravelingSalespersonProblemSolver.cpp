@@ -28,14 +28,10 @@ namespace TravelingSalespersonProblemSolver {
                                        const vector< vector< double > >& distances )
   {
     assert( tour.size() == distances.size() );
-    vector< size_t > tourCopy( tour );
-    sort( tourCopy.begin(), tourCopy.end() );
-    for ( size_t i = 0; i < tourCopy.size(); ++i ) {
-      if ( tourCopy[ i ] != i ) {
-        cerr << "sort( tourCopy )[ i ]: " << tourCopy[ i ] << ", i: " << i << endl;
-      }
-      assert( tourCopy[ i ] == i );
-    }
+    set< size_t > tourSet( tour.begin(), tour.end() );
+    assert( tourSet.size() == tour.size() );
+    assert( *tourSet.begin() == 0 );
+    assert( *tourSet.rbegin() + 1 == tour.size() );
   }
 
   vector< size_t > INLINE_ATTRIBUTE getRandomTour_( const vector< vector< double > >& distances )
@@ -325,7 +321,7 @@ namespace TravelingSalespersonProblemSolver {
   }
 
   double INLINE_ATTRIBUTE getLength_( const vector< size_t >& tour,
-                     const vector< vector< double > >& distances )
+                                      const vector< vector< double > >& distances )
   {
     double distance = distances[ tour.back() ][ tour.front() ];
     for ( size_t i = 0; i + 1 < tour.size(); ++i ) {
@@ -447,19 +443,18 @@ namespace TravelingSalespersonProblemSolver {
 
   size_t INLINE_ATTRIBUTE previous_( size_t node, const vector< size_t >& tour, const vector< size_t >& position )
   {
-    return tour[ ( position[ node ] + tour.size() - 1 ) % tour.size() ];
+    return position[ node ] > 0 ? tour[ position[ node ] - 1 ] : tour.back();
   }
 
   size_t INLINE_ATTRIBUTE next_( size_t node, const vector< size_t >& tour, const vector< size_t >& position )
   {
-    return tour[ ( position[ node ] + 1 ) % tour.size() ];
+    return position[ node ] + 1 < tour.size() ? tour[ position[ node ] + 1 ] : tour.front();
   }
 
   bool INLINE_ATTRIBUTE between_( size_t a, size_t b, size_t c, const vector< size_t >& position )
   {
-    return ( position[ a ] <= position[ c ] && position[ c ] <= position[ b ] ) ||
-           ( position[ b ] <= position[ a ] && position[ a ] <= position[ c ] ) ||
-           ( position[ c ] <= position[ b ] && position[ b ] <= position[ a ] );
+    return position[ a ] <= position[ c ] ? position[ a ] >= position[ b ] || position[ b ] >= position[ c ]
+                                          : position[ b ] <= position[ a ] && position[ b ] >= position[ c ];
   }
 
   void INLINE_ATTRIBUTE flip_( vector< size_t >& tour, vector< size_t >& position, size_t t1, size_t t2, size_t t3, size_t t4 )
@@ -758,8 +753,11 @@ namespace TravelingSalespersonProblemSolver {
 
           for ( size_t t5 = t2; t5 != t3; t5 = next_( t5, tour, position  ) ) {
             size_t t6 = next_( t5, tour, position );
-            for ( size_t t7 = t4; t7 != t1; t7 = next_( t7, tour, position  ) ) {
-              size_t t8 = next_( t7, tour, position );
+            for ( size_t t7index = 0; t7index < nearestNeighbors[ t6 ].size(); ++t7index ) {
+              size_t t7 = nearestNeighbors[ t6 ][ t7index ];
+              if ( !between_( t4, t1, t7, position ) || t7 == t1 ) {
+                continue;
+              }
 
               double gainSecondBridge = distances[ t5 ][ t6 ] + distances[ t7 ][ t8 ] - distances[ t6 ][ t7 ] - distances[ t5 ][ t8 ];
               if ( gainFirstBridge + gainSecondBridge > maxGain ) {
