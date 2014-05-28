@@ -14,7 +14,7 @@
 #include "TravelingSalespersonProblemSolver.h"
 
 // For profiling
-#if 0
+#if 1
 #define INLINE_ATTRIBUTE __attribute__ ((noinline))
 #else
 #define INLINE_ATTRIBUTE
@@ -199,19 +199,26 @@ namespace TravelingSalespersonProblemSolver {
   {
     numberOfNeighbors = min( numberOfNeighbors, distances.size() - 1 );
     vector< vector< size_t > > nearestNeighbors( distances.size(), vector< size_t >( numberOfNeighbors ) );
-    vector< pair< double, size_t > > tmpNeighbors( distances.size() );
+    set< pair< double, size_t > > tmpNeighbors;
     for ( size_t i = 0; i < distances.size(); ++i ) {
+      tmpNeighbors.clear();
       for ( size_t j = 0; j < distances[ i ].size(); ++j ) {
-        tmpNeighbors[ j ] = make_pair( distances[ i ][ j ], j );
+        if( j != i ) {
+          if ( tmpNeighbors.size() < numberOfNeighbors || distances[ i ][ j ] < tmpNeighbors.rbegin()->first ) {
+            if ( tmpNeighbors.size() >= numberOfNeighbors ) {
+              set< pair< double, size_t > >::iterator itLast = tmpNeighbors.end();
+              --itLast;
+              tmpNeighbors.erase( itLast );
+            }
+            tmpNeighbors.insert( make_pair( distances[ i ][ j ], j ) );
+          }
+        }
       }
-      sort( tmpNeighbors.begin(), tmpNeighbors.end() );
-      for ( size_t j = 0; j < numberOfNeighbors; ++j ) {
+      set< pair< double, size_t > >::const_iterator it = tmpNeighbors.begin();
+      for ( size_t j = 0; j < numberOfNeighbors; ++j, ++it ) {
         // Take neighbor j + 1 in order to avoid adding self as neighbor
-        nearestNeighbors[ i ][ j ] = tmpNeighbors[ j + 1 ].second;
+        nearestNeighbors[ i ][ j ] = it->second;
       }
-    }
-    for ( size_t i = 0; i < nearestNeighbors.size(); ++i ) {
-      assert( find( nearestNeighbors[ i ].begin(), nearestNeighbors[ i ].end(), i ) == nearestNeighbors[ i ].end() );
     }
     return nearestNeighbors;
   }
@@ -549,6 +556,55 @@ namespace TravelingSalespersonProblemSolver {
     }
   }
 
+  void INLINE_ATTRIBUTE compute2OptTour_( vector< size_t >& tour,
+                                          const vector< vector< double > >& distances,
+                                          const vector< vector< size_t > >& nearestNeighbors )
+  {
+    const double eps = 1e-9;
+    vector< size_t > position( tour.size() );
+    for ( size_t i = 0; i < tour.size(); ++i ) {
+      position[ tour[ i ] ] = i;
+    }
+
+    vector< size_t > bestTs;
+    bool changed = true;
+    while ( changed ) {
+      changed = false;
+      for ( size_t t1 = 0; t1 < tour.size(); ++t1 ) {
+        bestTs.assign( 4, (size_t)-1 );
+        double maxGain = 0.0;
+        for ( size_t t2choice = 0; t2choice < 2; ++t2choice  ) {
+          size_t t2 = t2choice == 0 ? previous_( t1, tour, position ) : next_( t1, tour, position );
+          for ( size_t t3index = 0; t3index < nearestNeighbors[ t2 ].size(); ++t3index ) {
+            size_t t3 = nearestNeighbors[ t2 ][ t3index ];
+            if ( t3 == previous_( t2, tour, position ) || t3 == next_( t2, tour, position ) ) {
+              continue;
+            }
+            if ( distances[ t2 ][ t3 ] >= distances[ t1 ][ t2 ] ) {
+              break;
+            }
+            size_t t4 = t2choice == 0 ? next_( t3, tour, position ) : previous_( t3, tour, position );
+            double gain = distances[ t1 ][ t2 ] + distances[ t3 ][ t4 ] - ( distances[ t1 ][ t4 ] + distances[ t2 ][ t3 ] );
+            if ( gain > maxGain ) {
+              maxGain = gain;
+              bestTs[ 0 ] = t1;
+              bestTs[ 1 ] = t2;
+              bestTs[ 2 ] = t3;
+              bestTs[ 3 ] = t4;
+            }
+          }
+        }
+        if ( maxGain > eps ) {
+          double lengthBefore = getLength_( tour, distances );
+          performMove_( bestTs, tour, position );
+          assert( getLength_( tour, distances ) < lengthBefore );
+          assertIsTour_( tour, position );
+          changed = true;
+        }
+      }
+    }
+  }
+
   void INLINE_ATTRIBUTE compute3OptTour_( vector< size_t >& tour,
                                           const vector< vector< double > >& distances,
                                           const vector< vector< size_t > >& nearestNeighbors )
@@ -643,59 +699,10 @@ namespace TravelingSalespersonProblemSolver {
           }
         }
         if ( G > eps ) {
-          vector< size_t > tourCopy( tour );
+          double lengthBefore = getLength_( tour, distances );
           performMove_( bestTs, tour, position );
-          assert( getLength_( tour, distances ) < getLength_( tourCopy, distances ) );
-          assertIsTour_( tour, distances );
-          changed = true;
-        }
-      }
-    }
-  }
-
-  void INLINE_ATTRIBUTE compute2OptTour_( vector< size_t >& tour,
-                                          const vector< vector< double > >& distances,
-                                          const vector< vector< size_t > >& nearestNeighbors )
-  {
-    const double eps = 1e-9;
-    vector< size_t > position( tour.size() );
-    for ( size_t i = 0; i < tour.size(); ++i ) {
-      position[ tour[ i ] ] = i;
-    }
-
-    vector< size_t > bestTs;
-    bool changed = true;
-    while ( changed ) {
-      changed = false;
-      for ( size_t t1 = 0; t1 < tour.size(); ++t1 ) {
-        bestTs.assign( 4, (size_t)-1 );
-        double maxGain = 0.0;
-        for ( size_t t2choice = 0; t2choice < 2; ++t2choice  ) {
-          size_t t2 = t2choice == 0 ? previous_( t1, tour, position ) : next_( t1, tour, position );
-          for ( size_t t3index = 0; t3index < nearestNeighbors[ t2 ].size(); ++t3index ) {
-            size_t t3 = nearestNeighbors[ t2 ][ t3index ];
-            if ( t3 == previous_( t2, tour, position ) || t3 == next_( t2, tour, position ) ) {
-              continue;
-            }
-            if ( distances[ t2 ][ t3 ] >= distances[ t1 ][ t2 ] ) {
-              break;
-            }
-            size_t t4 = t2choice == 0 ? next_( t3, tour, position ) : previous_( t3, tour, position );
-            double gain = distances[ t1 ][ t2 ] + distances[ t3 ][ t4 ] - ( distances[ t1 ][ t4 ] + distances[ t2 ][ t3 ] );
-            if ( gain > maxGain ) {
-              maxGain = gain;
-              bestTs[ 0 ] = t1;
-              bestTs[ 1 ] = t2;
-              bestTs[ 2 ] = t3;
-              bestTs[ 3 ] = t4;
-            }
-          }
-        }
-        if ( maxGain > eps ) {
-          vector< size_t > tourCopy( tour );
-          performMove_( bestTs, tour, position );
-          assert( getLength_( tour, distances ) < getLength_( tourCopy, distances ) );
-          assertIsTour_( tour, distances );
+          assert( getLength_( tour, distances ) < lengthBefore );
+          assertIsTour_( tour, position );
           changed = true;
         }
       }
@@ -773,10 +780,10 @@ namespace TravelingSalespersonProblemSolver {
           }
         }
         if ( maxGain > eps ) {
-          vector< size_t > tourCopy( tour );
+          double lengthBefore = getLength_( tour, distances );
           doubleBridgeSwap_( tour, position, bestTs[ 0 ], bestTs[ 1 ], bestTs[ 2 ], bestTs[ 3 ], bestTs[ 4 ], bestTs[ 5 ], bestTs[ 6 ], bestTs[ 7 ] );
-          assert( getLength_( tour, distances ) < getLength_( tourCopy, distances ) );
-          assertIsTour_( tour, distances );
+          assert( getLength_( tour, distances ) < lengthBefore );
+          assertIsTour_( tour, position );
           changed = true;
         }
       }
