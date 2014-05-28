@@ -25,13 +25,23 @@ using namespace std;
 namespace TravelingSalespersonProblemSolver {
   namespace {
   void INLINE_ATTRIBUTE assertIsTour_( const vector< size_t >& tour,
+                                       const vector< size_t >& position )
+  {
+    assert( tour.size() == position.size() );
+    for ( size_t i = 0; i < position.size(); ++i ) {
+      assert( tour[ position[ i ] ] == i );
+    }
+  }
+
+  void INLINE_ATTRIBUTE assertIsTour_( const vector< size_t >& tour,
                                        const vector< vector< double > >& distances )
   {
     assert( tour.size() == distances.size() );
-    set< size_t > tourSet( tour.begin(), tour.end() );
-    assert( tourSet.size() == tour.size() );
-    assert( *tourSet.begin() == 0 );
-    assert( *tourSet.rbegin() + 1 == tour.size() );
+    vector< size_t > position( tour.size() );
+    for ( size_t i = 0; i < tour.size(); ++i ) {
+      position[ tour[ i ] ] = i;
+    }
+    assertIsTour_( tour, position );
   }
 
   vector< size_t > INLINE_ATTRIBUTE getRandomTour_( const vector< vector< double > >& distances )
@@ -633,13 +643,11 @@ namespace TravelingSalespersonProblemSolver {
           }
         }
         if ( G > eps ) {
-          changed = true;
           vector< size_t > tourCopy( tour );
           performMove_( bestTs, tour, position );
-          if ( getLength_( tour, distances ) >= getLength_( tourCopy, distances ) ) {
-            cerr << getLength_( tour, distances ) << " " << getLength_( tourCopy, distances ) << endl;
-          }
           assert( getLength_( tour, distances ) < getLength_( tourCopy, distances ) );
+          assertIsTour_( tour, distances );
+          changed = true;
         }
       }
     }
@@ -684,8 +692,11 @@ namespace TravelingSalespersonProblemSolver {
           }
         }
         if ( maxGain > eps ) {
-          changed = true;
+          vector< size_t > tourCopy( tour );
           performMove_( bestTs, tour, position );
+          assert( getLength_( tour, distances ) < getLength_( tourCopy, distances ) );
+          assertIsTour_( tour, distances );
+          changed = true;
         }
       }
     }
@@ -762,7 +773,10 @@ namespace TravelingSalespersonProblemSolver {
           }
         }
         if ( maxGain > eps ) {
+          vector< size_t > tourCopy( tour );
           doubleBridgeSwap_( tour, position, bestTs[ 0 ], bestTs[ 1 ], bestTs[ 2 ], bestTs[ 3 ], bestTs[ 4 ], bestTs[ 5 ], bestTs[ 6 ], bestTs[ 7 ] );
+          assert( getLength_( tour, distances ) < getLength_( tourCopy, distances ) );
+          assertIsTour_( tour, distances );
           changed = true;
         }
       }
@@ -835,7 +849,6 @@ namespace TravelingSalespersonProblemSolver {
       compute3OptTour_( tour, distances, nearestNeighbors );
       double time( ( clock() - start ) / CLOCKS_PER_SEC );
       cerr << "4-opt tour distance: " << getLength_( tour, distances ) << ", time: " << time << endl;
-      assertIsTour_( tour, distances );
     }
 
     if ( false ) {
