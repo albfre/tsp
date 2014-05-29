@@ -660,177 +660,150 @@ bool INLINE_ATTRIBUTE improveTourDoubleBridge_( vector< size_t >& tour,
   return anyChange;
 }
 
-bool INLINE_ATTRIBUTE improveTourLinKernighan_( vector< size_t >& tour,
-                                                const vector< vector< double > >& distances,
-                                                const vector< vector< size_t > >& nearestNeighbors )
+bool INLINE_ATTRIBUTE linKernighanInnerLoop_( vector< size_t >& tour,
+                                              const vector< vector< double > >& distances,
+                                              const vector< vector< size_t > >& nearestNeighbors )
 {
   const double eps = 1e-9;
   vector< size_t > position( tour.size() );
   for ( size_t i = 0; i < tour.size(); ++i ) {
     position[ tour[ i ] ] = i;
   }
-  vector< size_t > bestTs;
-  bool anyChange = false;
-  bool changed = true;
-  while ( changed ) {
-    changed = false;
-
-start1:
-    vector< vector< size_t > > moveStack;
-    vector< size_t > tourCopy( tour );
-    vector< size_t > positionCopy( position );
-    for ( size_t t1 = 0; t1 < tour.size(); ++t1 ) {
-      double G = 0.0;
-      double lengthBefore = getLength_( tour, distances );
-      for ( size_t t2choice = 0; t2choice < 2; ++t2choice ) {
-        size_t t2 = t2choice == 0 ? previous_( t1, tour, position ) : next_( t1, tour, position );
-
-        for ( size_t t3index = 0; t3index < nearestNeighbors[ t2 ].size(); ++t3index ) {
-          size_t t3 = nearestNeighbors[ t2 ][ t3index ];
-          if ( t3 == previous_( t2, tour, position ) || t3 == next_( t2, tour, position ) ) {
-            continue;
-          }
-          double g1 = distances[ t1 ][ t2 ] - distances[ t2 ][ t3 ];
-          if ( g1 <= eps ) {
-            continue;
-          }
-          size_t t4 = t2choice == 0 ? next_( t3, tour, position ) : previous_( t3, tour, position );
-          if ( t4 == previous_( t2, tour, position ) || t4 == next_( t2, tour, position ) ) {
-            continue;
-          }
-
-          {
-            // Test for improving 2-opt move
-            double gain = g1 + distances[ t3 ][ t4 ] - distances[ t4 ][ t1 ];
-            if ( gain > eps ) {
-              performMove_( { t1, t2, t3, t4 }, tour, position );
-              assert( getLength_( tour, distances ) < lengthBefore );
-              assertIsTour_( tour, position );
-              anyChange = true;
-              changed = true;
-              goto start1;
-            }
-          }
-
-          G = g1;
-          moveStack.push_back( { t1, t2, t3, t4 } );
-          performMove_( moveStack.back(), tour, position );
-
-          size_t ta = t3;
-          size_t tb = t4;
-
-          vector< vector< size_t > > added;
-          vector< vector< size_t > > removed;
-          removed.push_back( { t1, t2 } );
-          removed.push_back( { t2, t1 } );
-          removed.push_back( { t3, t4 } );
-          removed.push_back( { t4, t3 } );
-          added.push_back( { t2, t3 } );
-          added.push_back( { t3, t2 } );
-
-          const vector< vector< size_t > > added2( added );
-          const vector< vector< size_t > > removed2( removed );
-          const vector< size_t > tour2( tour );
-          const vector< size_t > position2( position );
-          const size_t ta2 = ta;
-          const size_t tb2 = tb;
-          const double G2 = G;
-          vector< size_t > tc2NotTested = nearestNeighbors[ tb2 ];
-
-          // Outer while loop corresponds to backtracking over x2
-          while ( tc2NotTested.size() > 0 ) {
-            bool positiveGain = true;
-            size_t n = 2;
-
-            while ( positiveGain ) {
-              vector< size_t > tcNotTested = nearestNeighbors[ tb ];
-              if ( n == 2 ) {
-                added = added2;
-                removed = removed2;
-                tour = tour2;
-                position = position2;
-                ta = ta2;
-                tb = tb2;
-                G = G2;
-                tcNotTested = tc2NotTested;
-              }
-
-              positiveGain = false;
-              assert( tb == next_( t1, tour, position ) || tb == previous_( t1, tour, position ) );
-              bool tBchoice = tb == previous_( t1, tour, position );
-
-              while ( tcNotTested.size() > 0 ) {
-                size_t tc = 0;
-                size_t td = 0;
-                double bestDiff = numeric_limits< double >::lowest();
-                for ( size_t tCindex = 0; tCindex < tcNotTested.size(); ++tCindex ) {
-                  size_t testTc = tcNotTested[ tCindex ];
-                  size_t testTd = tBchoice ? next_( testTc, tour, position ) : previous_( testTc, tour, position );
-                  double diff = distances[ testTc ][ testTd ] - distances[ tb ][ testTc ];
-                  if ( diff > bestDiff ) {
-                    bestDiff = diff;
-                    tc = testTc;
-                    td = testTd;
-                  }
-                }
-                vector< size_t >::iterator it = find( tcNotTested.begin(), tcNotTested.end(), tc );
-                assert( it != tcNotTested.end() );
-                tcNotTested.erase( it );
-                if ( n == 2 ) {
-                  vector< size_t >::iterator it = find( tc2NotTested.begin(), tc2NotTested.end(), tc );
-                  assert( it != tc2NotTested.end() );
-                  tc2NotTested.erase( it );
-                }
-                double gn = distances[ ta ][ tb ] - distances[ tb ][ tc ];
-                if ( G + gn <= eps ) {
-                  continue;
-                }
-
-                vector< size_t > bc = { tb, tc };
-                vector< size_t > cd = { tc, td };
-                if ( find( removed.begin(), removed.end(), cd ) != removed.end() ) {
-                  continue;
-                }
-                if ( find( added.begin(), added.end(), cd ) != added.end() ) {
-                  continue;
-                }
-
-                G += gn;
-
-                // If connecting back to t1 leads to an improvement, then take it!
-                double gain = G + distances[ tc ][ td ] - distances[ td ][ t1 ];
-                if ( gain > eps ) {
-                  performMove_( { t1, tb, tc, td }, tour, position );
-                  assert( getLength_( tour, distances ) < lengthBefore );
-                  assertIsTour_( tour, position );
-                  anyChange = true;
-                  changed = true;
-                  goto start1;
-                }
-
-                moveStack.push_back( { t1, tb, tc, td } );
-                performMove_( moveStack.back(), tour, position );
-                removed.push_back( { tc, td } );
-                removed.push_back( { td, tc } );
-                added.push_back( { tb, tc } );
-                added.push_back( { tc, tb } );
-                ta = tc;
-                tb = td;
-                ++n;
-                positiveGain = true;
-                break;
-              }
-            }
-          }
-
-          // Found no gaining move. Rewind stack
-          tour = tourCopy;
-          position = positionCopy;
+  const vector< size_t > tourCopy( tour );
+  const vector< size_t > positionCopy( position );
+  const double lengthBefore = getLength_( tour, distances );
+  for ( size_t t1 = 0; t1 < tour.size(); ++t1 ) {
+    double G = 0.0;
+    for ( size_t t2choice = 0; t2choice < 2; ++t2choice ) {
+      size_t t2 = t2choice == 0 ? previous_( t1, tour, position ) : next_( t1, tour, position );
+      for ( size_t t3index = 0; t3index < nearestNeighbors[ t2 ].size(); ++t3index ) {
+        size_t t3 = nearestNeighbors[ t2 ][ t3index ];
+        if ( t3 == previous_( t2, tour, position ) || t3 == next_( t2, tour, position ) ) {
+          continue;
         }
+        double g1 = distances[ t1 ][ t2 ] - distances[ t2 ][ t3 ];
+        if ( g1 <= eps ) {
+          continue;
+        }
+        size_t t4 = t2choice == 0 ? next_( t3, tour, position ) : previous_( t3, tour, position );
+        if ( t4 == previous_( t2, tour, position ) || t4 == next_( t2, tour, position ) ) {
+          continue;
+        }
+
+        {
+          // Test for improving 2-opt move
+          double gain = g1 + distances[ t3 ][ t4 ] - distances[ t4 ][ t1 ];
+          if ( gain > eps ) {
+            performMove_( { t1, t2, t3, t4 }, tour, position );
+            assert( getLength_( tour, distances ) < lengthBefore );
+            assertIsTour_( tour, position );
+            return true;
+          }
+        }
+
+        G = g1;
+        vector< size_t > move( { t1, t2, t3, t4 } );
+        performMove_( move, tour, position );
+
+        // Save the state after x2 to enable backtracking
+        const double G2 = G;
+        const vector< size_t > tour2( tour );
+        const vector< size_t > position2( position );
+        const size_t ta2 = t3;
+        const size_t tb2 = t4;
+
+        vector< size_t > tcUntestedInStep2 = nearestNeighbors[ tb2 ];
+
+        // While loop corresponds to backtracking over x2 (second removed edge)
+        while ( tcUntestedInStep2.size() > 0 ) {
+          // Reset state to that after x0
+          vector< vector< size_t > > added( { { t2, t3 }, { t3, t2 } } );
+          vector< vector< size_t > > removed( { { t1, t2 }, { t2, t1 }, { t3, t4 }, { t4, t3 } } );
+          tour = tour2;
+          position = position2;
+          G = G2;
+          size_t ta = ta2;
+          size_t tb = tb2;
+
+          bool positiveGain = true;
+          size_t numberOfEdgesToRemove = 2;
+          while ( positiveGain ) {
+            positiveGain = false;
+            vector< size_t > mutableNearestNeighborList( nearestNeighbors[ tb ] );
+            vector< size_t >& tcUntested = numberOfEdgesToRemove == 2 ? tcUntestedInStep2 : mutableNearestNeighborList;
+            assert( tb == next_( t1, tour, position ) || tb == previous_( t1, tour, position ) );
+            const bool tBchoice = tb == previous_( t1, tour, position );
+
+            while ( tcUntested.size() > 0 ) {
+              // Select the most promising untested candidate for tc
+              size_t tc = 0, td = 0;
+              double bestDiff = numeric_limits< double >::lowest();
+              for ( size_t tcIndex = 0; tcIndex < tcUntested.size(); ++tcIndex ) {
+                size_t testTc = tcUntested[ tcIndex ];
+                size_t testTd = tBchoice ? next_( testTc, tour, position ) : previous_( testTc, tour, position );
+                double diff = distances[ testTc ][ testTd ] - distances[ tb ][ testTc ];
+                if ( diff > bestDiff ) {
+                  bestDiff = diff;
+                  tc = testTc;
+                  td = testTd;
+                }
+              }
+              vector< size_t >::iterator it = find( tcUntested.begin(), tcUntested.end(), tc );
+              assert( it != tcUntested.end() );
+              tcUntested.erase( it );
+
+              double gn = distances[ ta ][ tb ] - distances[ tb ][ tc ];
+              if ( G + gn <= eps ) {
+                continue;
+              }
+
+              vector< size_t > bc( { tb, tc } );
+              vector< size_t > cd( { tc, td } );
+              if ( find( removed.begin(), removed.end(), cd ) != removed.end() ) {
+                continue;
+              }
+              if ( find( added.begin(), added.end(), cd ) != added.end() ) {
+                continue;
+              }
+
+              G += gn;
+              performMove_( { t1, tb, tc, td }, tour, position );
+
+              // If connecting back to t1 leads to an improvement, then take it!
+              double gain = G + distances[ tc ][ td ] - distances[ td ][ t1 ];
+              if ( gain > eps ) {
+                assert( getLength_( tour, distances ) < lengthBefore );
+                assertIsTour_( tour, position );
+                return true;
+              }
+
+              removed.insert( removed.end(), { { tc, td }, { td, tc } } );
+              added.insert( added.end(), { { tb, tc }, { tc, tb } } );
+              ta = tc;
+              tb = td;
+              ++numberOfEdgesToRemove;
+              positiveGain = true;
+              break;
+            }
+          }
+        }
+
+        // Found no gaining move. Rewind stack
+        tour = tourCopy;
+        position = positionCopy;
       }
     }
   }
-  return anyChange;
+  return false;
+}
+
+bool INLINE_ATTRIBUTE improveTourLinKernighan_( vector< size_t >& tour,
+                                                const vector< vector< double > >& distances,
+                                                const vector< vector< size_t > >& nearestNeighbors )
+{
+  bool change = false;
+  while ( linKernighanInnerLoop_( tour, distances, nearestNeighbors ) ) { change = true; }
+  return change;
 }
 
 } // anonymous namespace
