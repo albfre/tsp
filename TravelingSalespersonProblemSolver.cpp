@@ -337,7 +337,8 @@ void INLINE_ATTRIBUTE flip_( vector< size_t >& tour, vector< size_t >& position,
     cerr << "t: " << t1 << " " << t2 << " " << t3 << " " << t4 << endl;
     cerr << "tpos: " << position[ t2 ] << " " << position[ t1 ] << " " << position[ t3 ] << " " << position[ t4 ] << endl;
   }
-  assert( t2 == next_( t1, tour, position ) && t3 == next_( t4, tour, position ) );
+  assert( t2 == next_( t1, tour, position ) );
+  assert( t3 == next_( t4, tour, position ) );
   size_t pt2 = position[ t2 ];
   size_t pt3 = position[ t3 ];
 
@@ -661,6 +662,87 @@ bool INLINE_ATTRIBUTE improveTourDoubleBridge_( vector< size_t >& tour,
 }
 
 bool INLINE_ATTRIBUTE linKernighanInnerLoop_( vector< size_t >& tour,
+                                              vector< size_t >& position,
+                                              vector< vector< size_t > >& added,
+                                              vector< vector< size_t > >& removed,
+                                              vector< size_t >& tcUntestedInStep2,
+                                              size_t ta,
+                                              size_t tb,
+                                              double G,
+                                              const size_t t1,
+                                              const double lengthBefore,
+                                              const vector< vector< double > >& distances,
+                                              const vector< vector< size_t > >& nearestNeighbors )
+{
+  assert( added.size() == 2 || added.size() == 4 );
+  assert( removed.size() == 4 || removed.size() == 6 );
+  const double eps = 1e-9;
+  bool positiveGain = true;
+  size_t numberOfEdgesToRemove = 2;
+  while ( positiveGain ) {
+    positiveGain = false;
+    vector< size_t > mutableNearestNeighborList( nearestNeighbors[ tb ] );
+    vector< size_t >& tcUntested = numberOfEdgesToRemove == 2 ? tcUntestedInStep2 : mutableNearestNeighborList;
+    assert( tb == next_( t1, tour, position ) || tb == previous_( t1, tour, position ) );
+    const bool tBchoice = tb == previous_( t1, tour, position );
+
+    while ( tcUntested.size() > 0 ) {
+      // Select the most promising untested candidate for tc
+      size_t tc = 0, td = 0;
+      double bestDiff = numeric_limits< double >::lowest();
+      for ( size_t tcIndex = 0; tcIndex < tcUntested.size(); ++tcIndex ) {
+        size_t testTc = tcUntested[ tcIndex ];
+        size_t testTd = tBchoice ? next_( testTc, tour, position ) : previous_( testTc, tour, position );
+        double diff = distances[ testTc ][ testTd ] - distances[ tb ][ testTc ];
+        if ( diff > bestDiff ) {
+          bestDiff = diff;
+          tc = testTc;
+          td = testTd;
+        }
+      }
+      vector< size_t >::iterator it = find( tcUntested.begin(), tcUntested.end(), tc );
+      assert( it != tcUntested.end() );
+      tcUntested.erase( it );
+
+      double gn = distances[ ta ][ tb ] - distances[ tb ][ tc ];
+      if ( G + gn <= eps ) {
+        continue;
+      }
+
+      vector< size_t > bc( { tb, tc } );
+      vector< size_t > cd( { tc, td } );
+      if ( find( removed.begin(), removed.end(), cd ) != removed.end() ) {
+        continue;
+      }
+      if ( find( added.begin(), added.end(), cd ) != added.end() ) {
+        continue;
+      }
+
+      G += gn;
+      performMove_( { t1, tb, tc, td }, tour, position );
+
+      // If connecting back to t1 leads to an improvement, then take it!
+      double gain = G + distances[ tc ][ td ] - distances[ td ][ t1 ];
+      if ( gain > eps ) {
+        assert( getLength_( tour, distances ) < lengthBefore );
+        assertIsTour_( tour, position );
+        return true;
+      }
+
+      removed.insert( removed.end(), { { tc, td }, { td, tc } } );
+      added.insert( added.end(), { { tb, tc }, { tc, tb } } );
+      ta = tc;
+      tb = td;
+      ++numberOfEdgesToRemove;
+      positiveGain = true;
+      break;
+    }
+  }
+  return false;
+}
+
+
+bool INLINE_ATTRIBUTE linKernighanOuterLoop_( vector< size_t >& tour,
                                               const vector< vector< double > >& distances,
                                               const vector< vector< size_t > >& nearestNeighbors )
 {
@@ -685,112 +767,136 @@ bool INLINE_ATTRIBUTE linKernighanInnerLoop_( vector< size_t >& tour,
         if ( g1 <= eps ) {
           continue;
         }
-        size_t t4 = t2choice == 0 ? next_( t3, tour, position ) : previous_( t3, tour, position );
-        if ( t4 == previous_( t2, tour, position ) || t4 == next_( t2, tour, position ) ) {
-          continue;
+
+        // First choice of t4
+        {
+          size_t t4 = t2choice == 0 ? next_( t3, tour, position ) : previous_( t3, tour, position );
+          if ( t4 == previous_( t2, tour, position ) || t4 == next_( t2, tour, position ) ) {
+            continue;
+          }
+
+          {
+            // Test for improving 2-opt move
+            double gain = g1 + distances[ t3 ][ t4 ] - distances[ t4 ][ t1 ];
+            if ( gain > eps ) {
+              performMove_( { t1, t2, t3, t4 }, tour, position );
+              assert( getLength_( tour, distances ) < lengthBefore );
+              assertIsTour_( tour, position );
+              return true;
+            }
+          }
+
+          G = g1;
+          performMove_( { t1, t2, t3, t4 }, tour, position );
+
+          // Save the state after x2 to enable backtracking
+          const double G2 = G;
+          const vector< size_t > tour2( tour );
+          const vector< size_t > position2( position );
+          const size_t ta2 = t3;
+          const size_t tb2 = t4;
+
+          vector< size_t > tcUntestedInStep2 = nearestNeighbors[ tb2 ];
+
+          // While loop corresponds to backtracking over x2 (second removed edge)
+          while ( tcUntestedInStep2.size() > 0 ) {
+            // Reset state to that after x0
+            vector< vector< size_t > > added( { { t2, t3 }, { t3, t2 } } );
+            vector< vector< size_t > > removed( { { t1, t2 }, { t2, t1 }, { t3, t4 }, { t4, t3 } } );
+            tour = tour2;
+            position = position2;
+            if ( linKernighanInnerLoop_( tour,
+                                         position,
+                                         added,
+                                         removed,
+                                         tcUntestedInStep2,
+                                         ta2,
+                                         tb2,
+                                         G2,
+                                         t1,
+                                         lengthBefore,
+                                         distances,
+                                         nearestNeighbors ) ) {
+              return true;
+            }
+          }
+          // Found no gaining move. Reset tour
+          tour = tourCopy;
+          position = positionCopy;
         }
 
         {
-          // Test for improving 2-opt move
-          double gain = g1 + distances[ t3 ][ t4 ] - distances[ t4 ][ t1 ];
-          if ( gain > eps ) {
-            performMove_( { t1, t2, t3, t4 }, tour, position );
-            assert( getLength_( tour, distances ) < lengthBefore );
-            assertIsTour_( tour, position );
-            return true;
+          // Second choice of t4
+          if ( t3 == previous_( t2, tour, position ) || t3 == next_( t2, tour, position ) ) {
+            continue;
           }
-        }
+          size_t t4 = t2choice == 0 ? previous_( t3, tour, position ) : next_( t3, tour, position );
+          if ( t4 == previous_( t2, tour, position ) || t4 == next_( t2, tour, position ) ) {
+            continue;
+          }
+          for ( size_t t5index = 0; t5index < nearestNeighbors[ t4 ].size(); ++t5index ) {
+            size_t t5 = nearestNeighbors[ t4 ][ t5index ];
+            if ( t5 == previous_( t4, tour, position ) || t5 == next_( t4, tour, position ) ) {
+              continue;
+            }
+            if ( t5 == t2 || t5 == t3 ) {
+              continue;
+            }
+            if ( ( t2choice == 0 && !between_( t3, t2, t5, position ) ) ||
+                 ( t2choice == 1 && !between_( t2, t3, t5, position ) ) ) {
+              continue;
+            }
+            double g2 = distances[ t3 ][ t4 ] - distances[ t4 ][ t5 ];
+            if ( g1 + g2 <= eps ) {
+              continue;
+            }
 
-        G = g1;
-        vector< size_t > move( { t1, t2, t3, t4 } );
-        performMove_( move, tour, position );
+            // Only consider one choice of t6. The other choice is possible, but clutters the code and doesn't lead to a significant improvement.
+            size_t t6choice = t2choice;
+            size_t t6 = t6choice == 0 ? next_( t5, tour, position ) : previous_( t5, tour, position );
+            if ( t6 == t3 || t6 == t2 || t6 == t1 ) {
+              continue;
+            }
+            G = g1 + g2;
 
-        // Save the state after x2 to enable backtracking
-        const double G2 = G;
-        const vector< size_t > tour2( tour );
-        const vector< size_t > position2( position );
-        const size_t ta2 = t3;
-        const size_t tb2 = t4;
+            performMove_( { t3, t4, t5, t6, t1, t2 }, tour, position );
 
-        vector< size_t > tcUntestedInStep2 = nearestNeighbors[ tb2 ];
+            // Save the state after x2 to enable backtracking
+            const double G2 = G;
+            const vector< size_t > tour2( tour );
+            const vector< size_t > position2( position );
+            const size_t ta2 = t5;
+            const size_t tb2 = t6;
 
-        // While loop corresponds to backtracking over x2 (second removed edge)
-        while ( tcUntestedInStep2.size() > 0 ) {
-          // Reset state to that after x0
-          vector< vector< size_t > > added( { { t2, t3 }, { t3, t2 } } );
-          vector< vector< size_t > > removed( { { t1, t2 }, { t2, t1 }, { t3, t4 }, { t4, t3 } } );
-          tour = tour2;
-          position = position2;
-          G = G2;
-          size_t ta = ta2;
-          size_t tb = tb2;
+            vector< size_t > tcUntestedInStep2 = nearestNeighbors[ tb2 ];
 
-          bool positiveGain = true;
-          size_t numberOfEdgesToRemove = 2;
-          while ( positiveGain ) {
-            positiveGain = false;
-            vector< size_t > mutableNearestNeighborList( nearestNeighbors[ tb ] );
-            vector< size_t >& tcUntested = numberOfEdgesToRemove == 2 ? tcUntestedInStep2 : mutableNearestNeighborList;
-            assert( tb == next_( t1, tour, position ) || tb == previous_( t1, tour, position ) );
-            const bool tBchoice = tb == previous_( t1, tour, position );
-
-            while ( tcUntested.size() > 0 ) {
-              // Select the most promising untested candidate for tc
-              size_t tc = 0, td = 0;
-              double bestDiff = numeric_limits< double >::lowest();
-              for ( size_t tcIndex = 0; tcIndex < tcUntested.size(); ++tcIndex ) {
-                size_t testTc = tcUntested[ tcIndex ];
-                size_t testTd = tBchoice ? next_( testTc, tour, position ) : previous_( testTc, tour, position );
-                double diff = distances[ testTc ][ testTd ] - distances[ tb ][ testTc ];
-                if ( diff > bestDiff ) {
-                  bestDiff = diff;
-                  tc = testTc;
-                  td = testTd;
-                }
-              }
-              vector< size_t >::iterator it = find( tcUntested.begin(), tcUntested.end(), tc );
-              assert( it != tcUntested.end() );
-              tcUntested.erase( it );
-
-              double gn = distances[ ta ][ tb ] - distances[ tb ][ tc ];
-              if ( G + gn <= eps ) {
-                continue;
-              }
-
-              vector< size_t > bc( { tb, tc } );
-              vector< size_t > cd( { tc, td } );
-              if ( find( removed.begin(), removed.end(), cd ) != removed.end() ) {
-                continue;
-              }
-              if ( find( added.begin(), added.end(), cd ) != added.end() ) {
-                continue;
-              }
-
-              G += gn;
-              performMove_( { t1, tb, tc, td }, tour, position );
-
-              // If connecting back to t1 leads to an improvement, then take it!
-              double gain = G + distances[ tc ][ td ] - distances[ td ][ t1 ];
-              if ( gain > eps ) {
-                assert( getLength_( tour, distances ) < lengthBefore );
-                assertIsTour_( tour, position );
+            // While loop corresponds to backtracking over x2 (second removed edge)
+            while ( tcUntestedInStep2.size() > 0 ) {
+              // Reset state to that after x0
+              vector< vector< size_t > > added( { { t2, t3 }, { t3, t2 }, { t4, t5 }, { t5, t4 } } );
+              vector< vector< size_t > > removed( { { t1, t2 }, { t2, t1 }, { t3, t4 }, { t4, t3 }, { t5, t6 }, { t6, t5 } } );
+              tour = tour2;
+              position = position2;
+              if ( linKernighanInnerLoop_( tour,
+                                           position,
+                                           added,
+                                           removed,
+                                           tcUntestedInStep2,
+                                           ta2,
+                                           tb2,
+                                           G2,
+                                           t1,
+                                           lengthBefore,
+                                           distances,
+                                           nearestNeighbors ) ) {
                 return true;
               }
-
-              removed.insert( removed.end(), { { tc, td }, { td, tc } } );
-              added.insert( added.end(), { { tb, tc }, { tc, tb } } );
-              ta = tc;
-              tb = td;
-              ++numberOfEdgesToRemove;
-              positiveGain = true;
-              break;
             }
+            // Found no gaining move. Reset tour
+            tour = tourCopy;
+            position = positionCopy;
           }
         }
-
-        // Found no gaining move. Rewind stack
-        tour = tourCopy;
-        position = positionCopy;
       }
     }
   }
@@ -802,7 +908,7 @@ bool INLINE_ATTRIBUTE improveTourLinKernighan_( vector< size_t >& tour,
                                                 const vector< vector< size_t > >& nearestNeighbors )
 {
   bool change = false;
-  while ( linKernighanInnerLoop_( tour, distances, nearestNeighbors ) ) { change = true; }
+  while ( linKernighanOuterLoop_( tour, distances, nearestNeighbors ) ) { change = true; }
   return change;
 }
 
