@@ -14,7 +14,7 @@
 #include "TravelingSalespersonProblemSolver.h"
 
 // For profiling
-#if 1
+#if 0
 #define INLINE_ATTRIBUTE __attribute__ ((noinline))
 #else
 #define INLINE_ATTRIBUTE
@@ -24,6 +24,15 @@ using namespace std;
 
 namespace TravelingSalespersonProblemSolver {
   namespace {
+  void printTour_( size_t n, const vector< size_t >& tour )
+  {
+    cerr << n << ". ";
+    for ( size_t i = 0; i < tour.size(); ++i ) {
+      cerr << tour[ i ] << " ";
+    }
+    cerr << endl;
+  }
+
   void INLINE_ATTRIBUTE assertIsTour_( const vector< size_t >& tour,
                                        const vector< size_t >& position )
   {
@@ -478,6 +487,7 @@ namespace TravelingSalespersonProblemSolver {
   {
 
     if ( !( t2 == next_( t1, tour, position ) && t3 == next_( t4, tour, position ) ) ) {
+      cerr << "t: " << t1 << " " << t2 << " " << t3 << " " << t4 << endl;
       cerr << "tpos: " << position[ t2 ] << " " << position[ t1 ] << " " << position[ t3 ] << " " << position[ t4 ] << endl;
     }
     assert( t2 == next_( t1, tour, position ) && t3 == next_( t4, tour, position ) );
@@ -789,6 +799,133 @@ namespace TravelingSalespersonProblemSolver {
       }
     }
   }
+
+  void INLINE_ATTRIBUTE computeVOptTour_( vector< size_t >& tour,
+                                                  const vector< vector< double > >& distances,
+                                                  const vector< vector< size_t > >& nearestNeighbors )
+  {
+    if ( tour.size() < 5 ) {
+      return;
+    }
+    const double eps = 1e-9;
+    vector< size_t > position( tour.size() );
+    for ( size_t i = 0; i < tour.size(); ++i ) {
+      position[ tour[ i ] ] = i;
+    }
+    vector< size_t > bestTs;
+    bool changed = true;
+    while ( changed ) {
+      changed = false;
+
+      vector< size_t > ts;
+      vector< vector< size_t > > moveStack;
+      for ( size_t t1 = 0; t1 < tour.size(); ++t1 ) {
+start1:
+        double G = 0.0;
+        double lengthBefore = getLength_( tour, distances );
+        ts.clear();
+        bestTs.clear();
+        vector< size_t > tourCopy( tour );
+        vector< size_t > positionCopy( position );
+        moveStack.clear();
+        for ( size_t t2choice = 0; t2choice < 2; ++t2choice ) {
+          size_t t2 = t2choice == 0 ? previous_( t1, tour, position ) : next_( t1, tour, position );
+
+          for ( size_t t3index = 0; t3index < nearestNeighbors[ t2 ].size(); ++t3index ) {
+            size_t t3 = nearestNeighbors[ t2 ][ t3index ];
+            if ( t3 == previous_( t2, tour, position ) || t3 == next_( t2, tour, position ) ) {
+              continue;
+            }
+            double g1 = distances[ t1 ][ t2 ] - distances[ t2 ][ t3 ];
+            if ( g1 <= eps ) {
+              continue;
+            }
+            size_t t4 = t2choice == 0 ? next_( t3, tour, position ) : previous_( t3, tour, position );
+            if ( t4 == previous_( t2, tour, position ) || t4 == next_( t2, tour, position ) ) {
+              continue;
+            }
+
+            {
+              // Test for improving 2-opt move
+              double gain = g1 + distances[ t3 ][ t4 ] - distances[ t4 ][ t1 ];
+              if ( gain > eps ) {
+                bestTs = { t1, t2, t3, t4 };
+                performMove_( bestTs, tour, position );
+                assert( getLength_( tour, distances ) < lengthBefore );
+                assertIsTour_( tour, position );
+                changed = true;
+                goto start1;
+              }
+            }
+
+            G = g1;
+            moveStack.push_back( { t1, t2, t3, t4 } );
+            performMove_( moveStack.back(), tour, position );
+
+            size_t ta = t3;
+            size_t tb = t4;
+
+            vector< vector< size_t > > added;
+            vector< vector< size_t > > removed;
+            removed.push_back( { t1, t2 } );
+            removed.push_back( { t2, t1 } );
+            removed.push_back( { t3, t4 } );
+            removed.push_back( { t4, t3 } );
+            added.push_back( { t2, t3 } );
+            added.push_back( { t3, t2 } );
+
+            bool found = true;
+            size_t n = 1;
+            while ( found ) {
+              found = false;
+              assert( tb == next_( t1, tour, position ) || tb == previous_( t1, tour, position ) );
+              bool tBchoice = tb == previous_( t1, tour, position );
+              for ( size_t tCindex = 0; tCindex < nearestNeighbors[ tb ].size(); ++tCindex ) {
+                size_t tc = nearestNeighbors[ tb ][ tCindex ];
+                size_t td = tBchoice ? next_( tc, tour, position ) : previous_( tc, tour, position );
+
+                double gn = distances[ ta ][ tb ] - distances[ tb ][ tc ];
+                vector< size_t > cd = { tc, td };
+                if ( find( added.begin(), added.end(), cd ) != added.end() ||
+                     find( removed.begin(), removed.end(), cd ) != removed.end() ) {
+                  continue;
+                }
+                if ( G + gn <= eps ) {
+                  continue;
+                }
+                G += gn;
+
+                double gain = G + distances[ tc ][ td ] - distances[ td ][ t1 ];
+                if ( gain > eps ) {
+                  performMove_( { t1, tb, tc, td }, tour, position );
+                  assert( getLength_( tour, distances ) < lengthBefore );
+                  assertIsTour_( tour, position );
+                  changed = true;
+//                  cerr << "took vopt " << n << endl;
+                  goto start1;
+                }
+                moveStack.push_back( { t1, tb, tc, td } );
+                performMove_( moveStack.back(), tour, position );
+                removed.push_back( { tc, td } );
+                removed.push_back( { td, tc } );
+                added.push_back( { tb, tc } );
+                added.push_back( { tc, tb } );
+                ta = tc;
+                tb = td;
+                ++n;
+                found = true;
+                break;
+              }
+            }
+
+            // Found no gaining move. Rewind stack
+            tour = tourCopy;
+            position = positionCopy;
+          }
+        }
+      }
+    }
+  }
   } // anonymous namespace
 
   vector< size_t > INLINE_ATTRIBUTE computeTour( const vector< vector< double > >& distances )
@@ -858,8 +995,15 @@ namespace TravelingSalespersonProblemSolver {
       cerr << "4-opt tour distance: " << getLength_( tour, distances ) << ", time: " << time << endl;
     }
 
-    if ( false ) {
-      compute5OptTour_( tour, distances, nearestNeighbors );
+    if ( true ) {
+      tour = tourGreedy;
+      double start( clock() );
+      compute3OptTour_( tour, distances, nearestNeighbors );
+      computeDoubleBridgeTour_( tour, distances, nearestNeighbors );
+      computeVOptTour_( tour, distances, nearestNeighbors );
+      compute3OptTour_( tour, distances, nearestNeighbors );
+      double time( ( clock() - start ) / CLOCKS_PER_SEC );
+      cerr << "V-opt tour distance: " << getLength_( tour, distances ) << ", time: " << time << endl;
     }
 
     return tour;
