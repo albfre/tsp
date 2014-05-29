@@ -340,12 +340,16 @@ void INLINE_ATTRIBUTE flip_( vector< size_t >& tour, vector< size_t >& position,
   assert( t2 == next_( t1, tour, position ) && t3 == next_( t4, tour, position ) );
   size_t pt2 = position[ t2 ];
   size_t pt3 = position[ t3 ];
-  if ( pt2 < pt3 ) {
+
+  if ( pt3 < pt2 ) {
+    swap( pt2, pt3 );
+  }
+  if ( pt3 - pt2 <= tour.size() - pt3 + pt2 ) {
     reverse( tour.begin() + pt2, tour.begin() + pt3 );
   }
   else {
-    vector< size_t >::iterator iIt = tour.begin() + pt2;
-    vector< size_t >::iterator jIt = tour.begin() + pt3;
+    vector< size_t >::iterator iIt = tour.begin() + pt3;
+    vector< size_t >::iterator jIt = tour.begin() + pt2;
     while ( iIt != tour.end() && jIt != tour.begin() ) {
       --jIt;
       iter_swap( iIt, jIt );
@@ -660,9 +664,6 @@ bool INLINE_ATTRIBUTE improveTourLinKernighan_( vector< size_t >& tour,
                                                 const vector< vector< double > >& distances,
                                                 const vector< vector< size_t > >& nearestNeighbors )
 {
-  if ( tour.size() < 5 ) {
-    return false;
-  }
   const double eps = 1e-9;
   vector< size_t > position( tour.size() );
   for ( size_t i = 0; i < tour.size(); ++i ) {
@@ -674,17 +675,13 @@ bool INLINE_ATTRIBUTE improveTourLinKernighan_( vector< size_t >& tour,
   while ( changed ) {
     changed = false;
 
-    vector< size_t > ts;
-    vector< vector< size_t > > moveStack;
-    for ( size_t t1 = 0; t1 < tour.size(); ++t1 ) {
 start1:
+    vector< vector< size_t > > moveStack;
+    vector< size_t > tourCopy( tour );
+    vector< size_t > positionCopy( position );
+    for ( size_t t1 = 0; t1 < tour.size(); ++t1 ) {
       double G = 0.0;
       double lengthBefore = getLength_( tour, distances );
-      ts.clear();
-      bestTs.clear();
-      vector< size_t > tourCopy( tour );
-      vector< size_t > positionCopy( position );
-      moveStack.clear();
       for ( size_t t2choice = 0; t2choice < 2; ++t2choice ) {
         size_t t2 = t2choice == 0 ? previous_( t1, tour, position ) : next_( t1, tour, position );
 
@@ -706,8 +703,7 @@ start1:
             // Test for improving 2-opt move
             double gain = g1 + distances[ t3 ][ t4 ] - distances[ t4 ][ t1 ];
             if ( gain > eps ) {
-              bestTs = { t1, t2, t3, t4 };
-              performMove_( bestTs, tour, position );
+              performMove_( { t1, t2, t3, t4 }, tour, position );
               assert( getLength_( tour, distances ) < lengthBefore );
               assertIsTour_( tour, position );
               anyChange = true;
@@ -753,6 +749,7 @@ start1:
               }
               G += gn;
 
+              // If connecting back to t1 leads to an improvement, then take it!
               double gain = G + distances[ tc ][ td ] - distances[ td ][ t1 ];
               if ( gain > eps ) {
                 performMove_( { t1, tb, tc, td }, tour, position );
@@ -760,7 +757,6 @@ start1:
                 assertIsTour_( tour, position );
                 anyChange = true;
                 changed = true;
-//                  cerr << "took vopt " << n << endl;
                 goto start1;
               }
               moveStack.push_back( { t1, tb, tc, td } );
@@ -859,17 +855,18 @@ vector< size_t > INLINE_ATTRIBUTE TravelingSalespersonProblemSolver::computeTour
   if ( true ) {
     tour = tourGreedy;
     double start( clock() );
-    bool changeOuter = true;
-    while ( changeOuter ) {
-      bool change = true;
-      while ( change ) {
-        change = improveTour3Opt_( tour, distances, nearestNeighbors );
-        change |= improveTourDoubleBridge_( tour, distances, nearestNeighbors );
-      }
-      changeOuter = improveTourLinKernighan_( tour, distances, nearestNeighbors );
-    }
+    improveTour3Opt_( tour, distances, nearestNeighbors );
+    improveTourDoubleBridge_( tour, distances, nearestNeighbors );
+    improveTourLinKernighan_( tour, distances, nearestNeighbors );
+    improveTour3Opt_( tour, distances, nearestNeighbors );
+    improveTourDoubleBridge_( tour, distances, nearestNeighbors );
+    improveTourLinKernighan_( tour, distances, nearestNeighbors );
     double time( ( clock() - start ) / CLOCKS_PER_SEC );
     cerr << "V-opt tour distance: " << getLength_( tour, distances ) << ", time: " << time << endl;
+  }
+
+  if ( false ) {
+    printTour_( 1, tourGreedy );
   }
 
   return tour;
