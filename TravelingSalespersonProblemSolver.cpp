@@ -825,7 +825,7 @@ bool INLINE_ATTRIBUTE linKernighanOuterLoop_( vector< size_t >& tour,
           position = positionCopy;
         }
 
-        {
+        if ( false ) {
           // Second choice of t4
           if ( t3 == previous_( t2, tour, position ) || t3 == next_( t2, tour, position ) ) {
             continue;
@@ -834,8 +834,28 @@ bool INLINE_ATTRIBUTE linKernighanOuterLoop_( vector< size_t >& tour,
           if ( t4 == previous_( t2, tour, position ) || t4 == next_( t2, tour, position ) ) {
             continue;
           }
-          for ( size_t t5index = 0; t5index < nearestNeighbors[ t4 ].size(); ++t5index ) {
-            size_t t5 = nearestNeighbors[ t4 ][ t5index ];
+          vector< size_t > t5Untested = nearestNeighbors[ t4 ];
+          while ( t5Untested.size() > 0 ) {
+            size_t t5 = 0;
+            size_t t6 = 0;
+            double bestDiff = numeric_limits< double >::lowest();
+            for ( size_t t5index = 0; t5index < t5Untested.size(); ++t5index ) {
+              size_t t5tmp = t5Untested[ t5index ];
+
+              // Only consider one choice of t6tmp. The other choice is possible, but clutters the code and doesn't lead to a significant improvement.
+              size_t t6choice = t2choice;
+              size_t t6tmp = t6choice == 0 ? next_( t5tmp, tour, position ) : previous_( t5tmp, tour, position );
+              double diff = distances[ t5tmp ][ t6tmp ] - distances[ t4 ][ t5tmp ];
+              if ( diff > bestDiff ) {
+                bestDiff = diff;
+                t5 = t5tmp;
+                t6 = t6tmp;
+              }
+            }
+            vector< size_t >::iterator it = find( t5Untested.begin(), t5Untested.end(), t5 );
+            assert( it != t5Untested.end() );
+            t5Untested.erase( it );
+
             if ( t5 == previous_( t4, tour, position ) || t5 == next_( t4, tour, position ) ) {
               continue;
             }
@@ -846,15 +866,12 @@ bool INLINE_ATTRIBUTE linKernighanOuterLoop_( vector< size_t >& tour,
                  ( t2choice == 1 && !between_( t2, t3, t5, position ) ) ) {
               continue;
             }
-            double g2 = distances[ t3 ][ t4 ] - distances[ t4 ][ t5 ];
-            if ( g1 + g2 <= eps ) {
+            if ( t6 == t3 || t6 == t2 || t6 == t1 ) {
               continue;
             }
 
-            // Only consider one choice of t6. The other choice is possible, but clutters the code and doesn't lead to a significant improvement.
-            size_t t6choice = t2choice;
-            size_t t6 = t6choice == 0 ? next_( t5, tour, position ) : previous_( t5, tour, position );
-            if ( t6 == t3 || t6 == t2 || t6 == t1 ) {
+            double g2 = distances[ t3 ][ t4 ] - distances[ t4 ][ t5 ];
+            if ( g1 + g2 <= eps ) {
               continue;
             }
             G = g1 + g2;
