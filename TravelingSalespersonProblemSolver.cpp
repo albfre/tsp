@@ -955,9 +955,13 @@ vector< size_t > INLINE_ATTRIBUTE TravelingSalespersonProblemSolver::computeTour
 
   vector< vector< size_t > > nearestNeighbors;
   vector< vector< size_t > > nearestNeighbors5;
+  vector< vector< size_t > > nearestNeighbors10;
+  vector< vector< size_t > > nearestNeighbors30;
   {
     double start( clock() );
     nearestNeighbors = computeNearestNeighbors_( distances, 20 );
+    nearestNeighbors30 = computeNearestNeighbors_( distances, 30 );
+    nearestNeighbors10 = computeNearestNeighbors_( distances, 10 );
     nearestNeighbors5 = computeNearestNeighbors_( distances, 5 );
     double time( ( clock() - start ) / CLOCKS_PER_SEC );
     cerr << "Time to compute " << nearestNeighbors.front().size() << " nearest neighbors: " << time << endl;
@@ -1003,15 +1007,12 @@ vector< size_t > INLINE_ATTRIBUTE TravelingSalespersonProblemSolver::computeTour
   if ( true ) {
     tour = tourGreedy;
     double start( clock() );
-    improveTour3Opt_( tour, distances, nearestNeighbors );
+    improveTour3Opt_( tour, distances, nearestNeighbors30 );
     improveTourDoubleBridge_( tour, distances, nearestNeighbors );
-    improveTourLinKernighan_( tour, distances, nearestNeighbors );
-    if ( improveTour3Opt_( tour, distances, nearestNeighbors ) || improveTourDoubleBridge_( tour, distances, nearestNeighbors ) ) {
-      if ( improveTourLinKernighan_( tour, distances, nearestNeighbors ) ) {
-        improveTour3Opt_( tour, distances, nearestNeighbors );
-        improveTourDoubleBridge_( tour, distances, nearestNeighbors );
-      }
-    }
+    improveTourLinKernighan_( tour, distances, nearestNeighbors10 );
+    improveTour3Opt_( tour, distances, nearestNeighbors30 );
+    improveTourDoubleBridge_( tour, distances, nearestNeighbors );
+    improveTour3Opt_( tour, distances, nearestNeighbors30 );
     double time( ( clock() - start ) / CLOCKS_PER_SEC );
     cerr << "V-opt tour distance: " << getLength_( tour, distances ) << ", time: " << time << endl;
   }
