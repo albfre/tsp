@@ -728,48 +728,86 @@ start1:
           added.push_back( { t2, t3 } );
           added.push_back( { t3, t2 } );
 
-          bool found = true;
-          size_t n = 1;
-          while ( found ) {
-            found = false;
-            assert( tb == next_( t1, tour, position ) || tb == previous_( t1, tour, position ) );
-            bool tBchoice = tb == previous_( t1, tour, position );
-            for ( size_t tCindex = 0; tCindex < nearestNeighbors[ tb ].size(); ++tCindex ) {
-              size_t tc = nearestNeighbors[ tb ][ tCindex ];
-              size_t td = tBchoice ? next_( tc, tour, position ) : previous_( tc, tour, position );
+          const vector< vector< size_t > > added2( added );
+          const vector< vector< size_t > > removed2( removed );
+          const vector< size_t > tour2( tour );
+          const vector< size_t > position2( position );
+          const size_t ta2 = ta;
+          const size_t tb2 = tb;
+          const double G2 = G;
+          size_t tcStartIndex2 = 0;
 
-              double gn = distances[ ta ][ tb ] - distances[ tb ][ tc ];
-              vector< size_t > cd = { tc, td };
-              if ( find( added.begin(), added.end(), cd ) != added.end() ||
-                   find( removed.begin(), removed.end(), cd ) != removed.end() ) {
-                continue;
-              }
-              if ( G + gn <= eps ) {
-                continue;
-              }
-              G += gn;
+          while ( tcStartIndex2 < nearestNeighbors[ tb2 ].size() ) {
+            bool found = true;
+            size_t n = 2;
 
-              // If connecting back to t1 leads to an improvement, then take it!
-              double gain = G + distances[ tc ][ td ] - distances[ td ][ t1 ];
-              if ( gain > eps ) {
-                performMove_( { t1, tb, tc, td }, tour, position );
-                assert( getLength_( tour, distances ) < lengthBefore );
-                assertIsTour_( tour, position );
-                anyChange = true;
-                changed = true;
-                goto start1;
+            while ( found ) {
+              size_t tcStartIndex = 0;
+              if ( n == 2 ) {
+                added = added2;
+                removed = removed2;
+                tour = tour2;
+                position = position2;
+                ta = ta2;
+                tb = tb2;
+                G = G2;
+                tcStartIndex = tcStartIndex2;
+/*                if ( tcStartIndex2 > 0 ) {
+                  tcStartIndex2 += nearestNeighbors[ tb2 ].size();
+                  break;
+                }
+                */
               }
-              moveStack.push_back( { t1, tb, tc, td } );
-              performMove_( moveStack.back(), tour, position );
-              removed.push_back( { tc, td } );
-              removed.push_back( { td, tc } );
-              added.push_back( { tb, tc } );
-              added.push_back( { tc, tb } );
-              ta = tc;
-              tb = td;
-              ++n;
-              found = true;
-              break;
+
+              found = false;
+              assert( tb == next_( t1, tour, position ) || tb == previous_( t1, tour, position ) );
+              bool tBchoice = tb == previous_( t1, tour, position );
+
+              for ( size_t tCindex = tcStartIndex; tCindex < nearestNeighbors[ tb ].size(); ++tCindex ) {
+                if ( n == 2 ) {
+                  ++tcStartIndex2;
+                }
+                size_t tc = nearestNeighbors[ tb ][ tCindex ];
+                size_t td = tBchoice ? next_( tc, tour, position ) : previous_( tc, tour, position );
+
+                vector< size_t > bc = { tb, tc };
+                vector< size_t > cd = { tc, td };
+                if ( find( removed.begin(), removed.end(), cd ) != removed.end() ) {
+                  continue;
+                }
+                if ( find( added.begin(), added.end(), cd ) != added.end() ) {
+                  continue;
+                }
+
+                double gn = distances[ ta ][ tb ] - distances[ tb ][ tc ];
+                if ( G + gn <= eps ) {
+                  continue;
+                }
+                G += gn;
+
+                // If connecting back to t1 leads to an improvement, then take it!
+                double gain = G + distances[ tc ][ td ] - distances[ td ][ t1 ];
+                if ( gain > eps ) {
+                  performMove_( { t1, tb, tc, td }, tour, position );
+                  assert( getLength_( tour, distances ) < lengthBefore );
+                  assertIsTour_( tour, position );
+                  anyChange = true;
+                  changed = true;
+                  goto start1;
+                }
+
+                moveStack.push_back( { t1, tb, tc, td } );
+                performMove_( moveStack.back(), tour, position );
+                removed.push_back( { tc, td } );
+                removed.push_back( { td, tc } );
+                added.push_back( { tb, tc } );
+                added.push_back( { tc, tb } );
+                ta = tc;
+                tb = td;
+                ++n;
+                found = true;
+                break;
+              }
             }
           }
 
