@@ -739,10 +739,10 @@ start1:
 
           // Outer while loop corresponds to backtracking over x2
           while ( tc2NotTested.size() > 0 ) {
-            bool found = true;
+            bool positiveGain = true;
             size_t n = 2;
 
-            while ( found ) {
+            while ( positiveGain ) {
               vector< size_t > tcNotTested = nearestNeighbors[ tb ];
               if ( n == 2 ) {
                 added = added2;
@@ -755,7 +755,7 @@ start1:
                 tcNotTested = tc2NotTested;
               }
 
-              found = false;
+              positiveGain = false;
               assert( tb == next_( t1, tour, position ) || tb == previous_( t1, tour, position ) );
               bool tBchoice = tb == previous_( t1, tour, position );
 
@@ -817,7 +817,7 @@ start1:
                 ta = tc;
                 tb = td;
                 ++n;
-                found = true;
+                positiveGain = true;
                 break;
               }
             }
@@ -909,10 +909,13 @@ vector< size_t > INLINE_ATTRIBUTE TravelingSalespersonProblemSolver::computeTour
     double start( clock() );
     improveTour3Opt_( tour, distances, nearestNeighbors );
     improveTourDoubleBridge_( tour, distances, nearestNeighbors );
-    improveTourLinKernighan_( tour, distances, nearestNeighbors5 );
-    improveTour3Opt_( tour, distances, nearestNeighbors );
-    improveTourDoubleBridge_( tour, distances, nearestNeighbors );
-    improveTourLinKernighan_( tour, distances, nearestNeighbors5 );
+    improveTourLinKernighan_( tour, distances, nearestNeighbors );
+    if ( improveTour3Opt_( tour, distances, nearestNeighbors ) || improveTourDoubleBridge_( tour, distances, nearestNeighbors ) ) {
+      if ( improveTourLinKernighan_( tour, distances, nearestNeighbors ) ) {
+        improveTour3Opt_( tour, distances, nearestNeighbors );
+        improveTourDoubleBridge_( tour, distances, nearestNeighbors );
+      }
+    }
     double time( ( clock() - start ) / CLOCKS_PER_SEC );
     cerr << "V-opt tour distance: " << getLength_( tour, distances ) << ", time: " << time << endl;
   }
