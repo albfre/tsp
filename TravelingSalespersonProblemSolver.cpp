@@ -278,7 +278,7 @@ double INLINE_ATTRIBUTE compute1TreeLength_( vector< size_t >& vertexDegrees,
 
 double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >& distances )
 {
-  double maxLength = numeric_limits< double >::min();
+  double maxLength = numeric_limits< double >::lowest();
   vector< double > lagrangeMultipliers( distances.size() );
   double lambda = 0.1;
   for ( size_t i = 0; i < 50; ++i ) {
@@ -735,14 +735,15 @@ start1:
           const size_t ta2 = ta;
           const size_t tb2 = tb;
           const double G2 = G;
-          size_t tcStartIndex2 = 0;
+          vector< size_t > tc2NotTested = nearestNeighbors[ tb2 ];
 
-          while ( tcStartIndex2 < nearestNeighbors[ tb2 ].size() ) {
+          // Outer while loop corresponds to backtracking over x2
+          while ( tc2NotTested.size() > 0 ) {
             bool found = true;
             size_t n = 2;
 
             while ( found ) {
-              size_t tcStartIndex = 0;
+              vector< size_t > tcNotTested = nearestNeighbors[ tb ];
               if ( n == 2 ) {
                 added = added2;
                 removed = removed2;
@@ -751,24 +752,39 @@ start1:
                 ta = ta2;
                 tb = tb2;
                 G = G2;
-                tcStartIndex = tcStartIndex2;
-/*                if ( tcStartIndex2 > 0 ) {
-                  tcStartIndex2 += nearestNeighbors[ tb2 ].size();
-                  break;
-                }
-                */
+                tcNotTested = tc2NotTested;
               }
 
               found = false;
               assert( tb == next_( t1, tour, position ) || tb == previous_( t1, tour, position ) );
               bool tBchoice = tb == previous_( t1, tour, position );
 
-              for ( size_t tCindex = tcStartIndex; tCindex < nearestNeighbors[ tb ].size(); ++tCindex ) {
-                if ( n == 2 ) {
-                  ++tcStartIndex2;
+              while ( tcNotTested.size() > 0 ) {
+                size_t tc = 0;
+                size_t td = 0;
+                double bestDiff = numeric_limits< double >::lowest();
+                for ( size_t tCindex = 0; tCindex < tcNotTested.size(); ++tCindex ) {
+                  size_t testTc = tcNotTested[ tCindex ];
+                  size_t testTd = tBchoice ? next_( testTc, tour, position ) : previous_( testTc, tour, position );
+                  double diff = distances[ testTc ][ testTd ] - distances[ tb ][ testTc ];
+                  if ( diff > bestDiff ) {
+                    bestDiff = diff;
+                    tc = testTc;
+                    td = testTd;
+                  }
                 }
-                size_t tc = nearestNeighbors[ tb ][ tCindex ];
-                size_t td = tBchoice ? next_( tc, tour, position ) : previous_( tc, tour, position );
+                vector< size_t >::iterator it = find( tcNotTested.begin(), tcNotTested.end(), tc );
+                assert( it != tcNotTested.end() );
+                tcNotTested.erase( it );
+                if ( n == 2 ) {
+                  vector< size_t >::iterator it = find( tc2NotTested.begin(), tc2NotTested.end(), tc );
+                  assert( it != tc2NotTested.end() );
+                  tc2NotTested.erase( it );
+                }
+                double gn = distances[ ta ][ tb ] - distances[ tb ][ tc ];
+                if ( G + gn <= eps ) {
+                  continue;
+                }
 
                 vector< size_t > bc = { tb, tc };
                 vector< size_t > cd = { tc, td };
@@ -779,10 +795,6 @@ start1:
                   continue;
                 }
 
-                double gn = distances[ ta ][ tb ] - distances[ tb ][ tc ];
-                if ( G + gn <= eps ) {
-                  continue;
-                }
                 G += gn;
 
                 // If connecting back to t1 leads to an improvement, then take it!
@@ -846,9 +858,11 @@ vector< size_t > INLINE_ATTRIBUTE TravelingSalespersonProblemSolver::computeTour
   cerr << setprecision( 8 );
 
   vector< vector< size_t > > nearestNeighbors;
+  vector< vector< size_t > > nearestNeighbors5;
   {
     double start( clock() );
     nearestNeighbors = computeNearestNeighbors_( distances, 20 );
+    nearestNeighbors5 = computeNearestNeighbors_( distances, 5 );
     double time( ( clock() - start ) / CLOCKS_PER_SEC );
     cerr << "Time to compute " << nearestNeighbors.front().size() << " nearest neighbors: " << time << endl;
   }
@@ -895,10 +909,10 @@ vector< size_t > INLINE_ATTRIBUTE TravelingSalespersonProblemSolver::computeTour
     double start( clock() );
     improveTour3Opt_( tour, distances, nearestNeighbors );
     improveTourDoubleBridge_( tour, distances, nearestNeighbors );
-    improveTourLinKernighan_( tour, distances, nearestNeighbors );
+    improveTourLinKernighan_( tour, distances, nearestNeighbors5 );
     improveTour3Opt_( tour, distances, nearestNeighbors );
     improveTourDoubleBridge_( tour, distances, nearestNeighbors );
-    improveTourLinKernighan_( tour, distances, nearestNeighbors );
+    improveTourLinKernighan_( tour, distances, nearestNeighbors5 );
     double time( ( clock() - start ) / CLOCKS_PER_SEC );
     cerr << "V-opt tour distance: " << getLength_( tour, distances ) << ", time: " << time << endl;
   }
