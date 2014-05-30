@@ -775,19 +775,16 @@ bool INLINE_ATTRIBUTE linKernighanOuterLoop_( vector< size_t >& tour,
             continue;
           }
 
-          {
-            // Test for improving 2-opt move
-            double gain = g1 + distances[ t3 ][ t4 ] - distances[ t4 ][ t1 ];
-            if ( gain > eps ) {
-              performMove_( { t1, t2, t3, t4 }, tour, position );
-              assert( getLength_( tour, distances ) < lengthBefore );
-              assertIsTour_( tour, position );
-              return true;
-            }
+          performMove_( { t1, t2, t3, t4 }, tour, position );
+          // Test for improving 2-opt move
+          double gain = g1 + distances[ t3 ][ t4 ] - distances[ t4 ][ t1 ];
+          if ( gain > eps ) {
+            assert( getLength_( tour, distances ) < lengthBefore );
+            assertIsTour_( tour, position );
+            return true;
           }
 
           G = g1;
-          performMove_( { t1, t2, t3, t4 }, tour, position );
 
           // Save the state after x2 to enable backtracking
           const double G2 = G;
