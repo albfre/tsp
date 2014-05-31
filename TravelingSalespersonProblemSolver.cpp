@@ -14,7 +14,7 @@
 #include "TravelingSalespersonProblemSolver.h"
 
 // For profiling
-#if 1
+#if 0
 #define INLINE_ATTRIBUTE __attribute__ ((noinline))
 #else
 #define INLINE_ATTRIBUTE
@@ -702,7 +702,7 @@ bool INLINE_ATTRIBUTE linKernighanInnerLoop_( vector< size_t >& tour,
       }
       vector< size_t >::iterator it = find( tcUntested.begin(), tcUntested.end(), tc );
       assert( it != tcUntested.end() );
-      swap( *it, tcUntested.back() );
+      *it = tcUntested.back();
       tcUntested.pop_back();
 
       double gn = distances[ ta ][ tb ] - distances[ tb ][ tc ];
@@ -838,9 +838,6 @@ bool INLINE_ATTRIBUTE linKernighanOuterLoop_( vector< size_t >& tour,
             continue;
           }
           size_t t4 = t2choice == 0 ? previous_( t3, tour, position ) : next_( t3, tour, position );
-          if ( t4 == previous_( t2, tour, position ) || t4 == next_( t2, tour, position ) ) {
-            continue;
-          }
           vector< size_t > t5Untested = nearestNeighbors[ t4 ];
           while ( t5Untested.size() > 0 ) {
             size_t t5 = 0;
@@ -861,19 +858,17 @@ bool INLINE_ATTRIBUTE linKernighanOuterLoop_( vector< size_t >& tour,
             }
             vector< size_t >::iterator it = find( t5Untested.begin(), t5Untested.end(), t5 );
             assert( it != t5Untested.end() );
-            t5Untested.erase( it );
+            *it = t5Untested.back();
+            t5Untested.pop_back();
 
-            if ( t5 == previous_( t4, tour, position ) || t5 == next_( t4, tour, position ) ) {
+            if ( t5 == t3 || t5 == t2 ) {
               continue;
             }
-            if ( t5 == t2 || t5 == t3 ) {
+            if ( t6 == t3 || t6 == t2 || t6 == t1 ) {
               continue;
             }
             if ( ( t2choice == 0 && !between_( t3, t2, t5, position ) ) ||
                  ( t2choice == 1 && !between_( t2, t3, t5, position ) ) ) {
-              continue;
-            }
-            if ( t6 == t3 || t6 == t2 || t6 == t1 ) {
               continue;
             }
 
