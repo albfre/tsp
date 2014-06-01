@@ -712,7 +712,7 @@ bool INLINE_ATTRIBUTE linKernighanInnerLoop_( vector< size_t >& tour,
 
       vector< size_t > bc( { tb, tc } );
       vector< size_t > cd( { tc, td } );
-      if ( find( removed.begin(), removed.end(), cd ) != removed.end() ) {
+      if ( find( removed.begin(), removed.end(), bc ) != removed.end() ) {
         continue;
       }
       if ( find( added.begin(), added.end(), cd ) != added.end() ) {
@@ -738,6 +738,229 @@ bool INLINE_ATTRIBUTE linKernighanInnerLoop_( vector< size_t >& tour,
       ++numberOfEdgesToRemove;
       positiveGain = true;
       break;
+    }
+  }
+  return false;
+}
+
+bool INLINE_ATTRIBUTE linKernighanInnerLoop2_( vector< size_t >& tour,
+                                              vector< size_t >& position,
+                                              vector< vector< size_t > >& added,
+                                              vector< vector< size_t > >& removed,
+                                              vector< size_t >& tcUntestedInStep2,
+                                              size_t ta,
+                                              size_t tb,
+                                              double G,
+                                              const size_t t1,
+                                              const double lengthBefore,
+                                              const vector< vector< double > >& distances,
+                                              const vector< vector< size_t > >& nearestNeighbors )
+{
+  assert( added.size() == 2 || added.size() == 4 );
+  assert( removed.size() == 4 || removed.size() == 6 );
+  const double eps = 1e-9;
+  bool positiveGain = true;
+  size_t numberOfEdgesToRemove = 2;
+  while ( positiveGain ) {
+    positiveGain = false;
+    vector< size_t > mutableNearestNeighborList( nearestNeighbors[ tb ] );
+    vector< size_t >& tcUntested = numberOfEdgesToRemove == 2 ? tcUntestedInStep2 : mutableNearestNeighborList;
+    assert( tb == next_( t1, tour, position ) || tb == previous_( t1, tour, position ) );
+    const size_t tbChoice = tb == previous_( t1, tour, position ) ? 0 : 1;
+
+    vector< pair< size_t, size_t > > tcTdPairs;
+    vector< size_t > tcs;
+    while ( tcUntested.size() > 0 ) {
+      // Select the most promising untested candidate for tc
+      size_t tc = 0, td = 0;
+      size_t tdChoice = 0;
+      {
+        double bestDiff = numeric_limits< double >::lowest();
+        for ( size_t tcIndex = 0; tcIndex < tcUntested.size(); ++tcIndex ) {
+          size_t testTc = tcUntested[ tcIndex ];
+          for ( size_t testTdChoice = 0; testTdChoice < 2; ++testTdChoice ) {
+            size_t testTd = testTdChoice == 0 ? next_( testTc, tour, position ) : previous_( testTc, tour, position );
+            if ( find( tcTdPairs.begin(), tcTdPairs.end(), make_pair( testTc, testTd ) ) != tcTdPairs.end() ) {
+              continue;
+            }
+            double diff = distances[ testTc ][ testTd ] - distances[ tb ][ testTc ];
+            if ( diff > bestDiff ) {
+              bestDiff = diff;
+              tc = testTc;
+              td = testTd;
+              tdChoice = testTdChoice;
+            }
+          }
+        }
+      }
+      if ( find( tcs.begin(), tcs.end(), tc ) != tcs.end() ) {
+        vector< size_t >::iterator it = find( tcUntested.begin(), tcUntested.end(), tc );
+        assert( it != tcUntested.end() );
+        *it = tcUntested.back();
+        tcUntested.pop_back();
+      }
+      else {
+        tcs.push_back( tc );
+        tcTdPairs.push_back( make_pair( tc, td ) );
+      }
+      if ( td == t1 || td == tb || td == previous_( tb, tour, position ) || td == next_( tb, tour, position ) ) {
+        continue;
+      }
+
+      double gn1 = distances[ ta ][ tb ] - distances[ tb ][ tc ];
+      if ( G + gn1 <= eps ) {
+        continue;
+      }
+//      cerr << "G: " << G << " gn1: " << gn1 << endl;
+
+      vector< size_t > bc( { tb, tc } );
+      vector< size_t > cd( { tc, td } );
+      if ( find( removed.begin(), removed.end(), bc ) != removed.end() ) {
+        continue;
+      }
+      if ( find( added.begin(), added.end(), cd ) != added.end() ) {
+        continue;
+      }
+//      cerr << "gain: " << G + gn1 +distances[ tc ][ td ] - distances[ td ][ t1 ] << endl;
+//      cerr << "distdiff: " << distances[ tc ][ td ] - distances[ td ][ t1 ] << endl;
+//          cerr << numberOfEdgesToRemove << "t . " << t1 << " " <<  ta << " " << tb << " " << tc << " " << td << endl;
+//          cerr << "pos. " << position[t1] << " " << position[ta ]<< " " << position[tb ]<< " " << position[tc ]<< " " << position[td ]<< endl;
+
+
+      // First choice of td
+      if ( tdChoice == tbChoice ) {
+
+        // If connecting back to t1 leads to an improvement, then take it!
+        double gain = G + gn1 + distances[ tc ][ td ] - distances[ td ][ t1 ];
+        if ( gain > eps ) {
+          performMove_( { t1, tb, tc, td }, tour, position );
+          added.insert( added.end(), { { t1, td }, { td, t1 } } );
+//          cerr << getLength_( tour, distances ) << " " << lengthBefore << endl;
+          assertIsTour_( tour, position );
+          assert( getLength_( tour, distances ) < lengthBefore );
+          return true;
+        }
+
+        size_t te = 0; size_t tf = 0;
+        vector< size_t > teUntested = nearestNeighbors[ td ];
+        while ( teUntested.size() > 0 ) {
+          {
+            double bestDiff = numeric_limits< double >::lowest();
+            for ( size_t teIndex = 0; teIndex < teUntested.size(); ++teIndex ) {
+              size_t testTe = teUntested[ teIndex ];
+              size_t testTf = between_( tb, td, testTe, position ) ? next_( testTe, tour, position ) : previous_( testTe, tour, position );
+              double diff = distances[ testTe ][ testTf ] - distances[ td ][ testTe ];
+              if ( diff > bestDiff ) {
+                bestDiff = diff;
+                te = testTe;
+                tf = testTf;
+              }
+            }
+          }
+          vector< size_t >::iterator it = find( teUntested.begin(), teUntested.end(), te );
+          assert( it != teUntested.end() );
+          *it = teUntested.back();
+          teUntested.pop_back();
+
+          double gn2 = distances[ tc ][ td ] - distances[ td ][ te ];
+          if ( G + gn1 + gn2 <= eps ) {
+            continue;
+          }
+          if ( tf == ta ) {
+            continue;
+          }
+          if ( td == previous_( tb, tour, position ) || td == next_( tb, tour, position ) ) {
+            continue;
+          }
+          vector< size_t > ef( { te, tf } );
+          vector< size_t > de( { td, te } );
+          if ( find( removed.begin(), removed.end(), ef ) != removed.end() ) {
+            continue;
+          }
+          if ( find( added.begin(), added.end(), de ) != added.end() ) {
+            continue;
+          }
+          G += gn1 + gn2;
+//          printTour_( 3, tour );
+          performMove_( { t1, tb, tc, td, te, tf }, tour, position );
+          added.insert( added.end(), { { tb, tc }, { tc, tb }, { td, te }, { te, td } } );
+          removed.insert( removed.end(), { { tc, td }, { td, tc }, { te, tf }, { tf, te } } );
+
+          // Test for improving 3-Opt move
+          double gain = G + distances[ te ][ tf ] - distances[ tf ][ t1 ];
+          if ( gain > eps ) {
+            assert( getLength_( tour, distances ) < lengthBefore );
+            assertIsTour_( tour, position );
+            return true;
+          }
+
+          ta = te;
+          tb = tf;
+          ++numberOfEdgesToRemove;
+          positiveGain = true;
+          break;
+        }
+      }
+      else {
+        continue;
+        // Second choice of td
+        size_t te = 0; size_t tf = 0;
+        vector< size_t > teUntested = nearestNeighbors[ td ];
+        while ( teUntested.size() > 0 ) {
+          {
+            double bestDiff = numeric_limits< double >::lowest();
+            for ( size_t teIndex = 0; teIndex < teUntested.size(); ++teIndex ) {
+              size_t testTe = teUntested[ teIndex ];
+              // Only consider one choice of te
+              size_t testTf = tbChoice == 0 ? next_( testTe, tour, position ) : previous_( testTe, tour, position );
+              double diff = distances[ testTe ][ testTf ] - distances[ td ][ testTe ];
+              if ( diff > bestDiff ) {
+                bestDiff = diff;
+                te = testTe;
+                tf = testTf;
+              }
+            }
+          }
+          vector< size_t >::iterator it = find( teUntested.begin(), teUntested.end(), tc );
+          assert( it != teUntested.end() );
+          *it = teUntested.back();
+          teUntested.pop_back();
+
+          if ( ( tbChoice == 0 && !between_( tc, tb, te, position ) ) ||
+               ( tbChoice == 1 && !between_( tb, tc, te, position ) ) ) {
+            continue;
+          }
+
+          double gn2 = distances[ tc ][ td ] - distances[ td ][ te ];
+          if ( G + gn1 + gn2 <= eps ) {
+            continue;
+          }
+          if ( tf == tc || tf == tb || tf == ta ) {
+            continue;
+          }
+          G += gn1 + gn2;
+          performMove_( { tc, td, te, tf, ta, tb }, tour, position );
+          added.insert( added.end(), { { td, te }, { te, td } } );
+          removed.insert( removed.end(), { { te, tf }, { tf, te } } );
+
+          // Test for improving 3-Opt move
+          double gain = G + distances[ te ][ tf ] - distances[ tf ][ ta ];
+          if ( gain > eps ) {
+            assert( getLength_( tour, distances ) < lengthBefore );
+            assertIsTour_( tour, position );
+            return true;
+          }
+
+          ta = te;
+          tb = tf;
+          ++numberOfEdgesToRemove;
+          positiveGain = true;
+          break;
+        }
+      }
+      if ( positiveGain ) {
+        break;
+      }
     }
   }
   return false;
