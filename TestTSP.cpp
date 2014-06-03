@@ -30,7 +30,7 @@ double computeDistance( const vector< double >& point1, const vector< double >& 
 void testTSPRegular( size_t numOfPoints )
 {
   size_t numOfPointsBefore = numOfPoints;
-  for ( size_t ii = 0; ii < 1; ++ii ) {
+  for ( size_t iii = 0; iii < 1; ++iii ) {
     numOfPoints = numOfPointsBefore;
   vector< vector< double > > points;
   size_t rows = size_t( sqrt( double( numOfPoints ) ) );
@@ -72,7 +72,7 @@ void testTSPRegular( size_t numOfPoints )
 
 void testTSPRandom( size_t numOfPoints )
 {
-  for ( size_t ii = 0; ii < 1; ++ii ) {
+  for ( size_t iii = 0; iii < 1; ++iii ) {
   vector< vector< double > > points( numOfPoints, vector< double >( 2 ) );
   for ( size_t i = 0; i < numOfPoints; ++i ) {
     points[ i ][ 0 ] = double( rand() ) / RAND_MAX;

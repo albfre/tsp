@@ -793,9 +793,6 @@ bool INLINE_ATTRIBUTE linKernighanInnerLoop2_( vector< size_t >& tour,
   bool positiveGain = true;
   size_t numberOfEdgesToRemove = 2;
 
-  vector< size_t > bestTs;
-  vector< size_t > bestTsG;
-
   while ( positiveGain ) {
     positiveGain = false;
     vector< size_t > mutableNearestNeighborList( nearestNeighbors[ t2 ] );
@@ -805,6 +802,9 @@ bool INLINE_ATTRIBUTE linKernighanInnerLoop2_( vector< size_t >& tour,
     const size_t t2choice = t2 == previous_( t0, tour, position ) ? 0 : 1;
     double bestGain = 0.0;
     double bestG = 0.0;
+    vector< size_t > bestTs;
+    vector< size_t > bestTsG;
+    size_t nextT1 = 0, nextT2 = 0;
 
     for ( size_t t3index = 0; t3index < nearestNeighbors[ t2 ].size(); ++t3index ) {
       size_t t3 = nearestNeighbors[ t2 ][ t3index ];
@@ -815,112 +815,140 @@ bool INLINE_ATTRIBUTE linKernighanInnerLoop2_( vector< size_t >& tour,
       if ( G + g1 <= eps ) {
         continue;
       }
-      // First choice of t4
-      size_t t4 = t2choice == 0 ? next_( t3, tour, position ) : previous_( t3, tour, position );
-      if ( t4 == previous_( t2, tour, position ) || t4 == next_( t2, tour, position ) ) {
-        continue;
-      }
-      vector< size_t > t2t3( { t2, t3 } );
-      vector< size_t > t3t4( { t3, t4 } );
-      if ( find( removed.begin(), removed.end(), t2t3 ) != removed.end() ) {
-        continue;
-      }
-      if ( find( added.begin(), added.end(), t3t4 ) != added.end() ) {
-        continue;
-      }
 
       {
-        // Test for improving 2-opt move
-        double gain = g1 + distances[ t3 ][ t4 ] - distances[ t4 ][ t0 ];
-        if ( G + gain > bestGain ) {
-          bestGain = G + gain;
-          bestTs = { t0, t2, t3, t4 };
+        // First choice of t4
+        size_t t4 = t2choice == 0 ? next_( t3, tour, position ) : previous_( t3, tour, position );
+        if ( t4 == previous_( t2, tour, position ) || t4 == next_( t2, tour, position ) ) {
+          continue;
+        }
+        vector< size_t > t2t3( { t2, t3 } );
+        vector< size_t > t3t4( { t3, t4 } );
+        if ( find( removed.begin(), removed.end(), t2t3 ) != removed.end() ) {
+          continue;
+        }
+        if ( find( added.begin(), added.end(), t3t4 ) != added.end() ) {
+          continue;
+        }
+
+        {
+          // Test for improving 2-opt move
+          double gain = g1 + distances[ t3 ][ t4 ] - distances[ t4 ][ t0 ];
+          if ( G + gain > bestGain ) {
+            bestGain = G + gain;
+            bestTs = { t0, t2, t3, t4 };
+          }
+          if ( G + g1 > bestG ) {
+            bestTsG = { t0, t2, t3, t4 };
+            bestG = G + g1;
+            nextT1 = t3;
+            nextT2 = t4;
+          }
+        }
+        for ( size_t t5index = 0; t5index < nearestNeighbors[ t4 ].size(); ++t5index ) {
+          size_t t5 = nearestNeighbors[ t4 ][ t5index ];
+          if ( t5 == previous_( t4, tour, position ) || t5 == next_( t4, tour, position ) ) {
+            continue;
+          }
+          double g2 = distances[ t3 ][ t4 ] - distances[ t4 ][ t5 ];
+          if ( G + g1 + g2 <= eps ) {
+            continue;
+          }
+
+          // Select t6 such that a valid tour is created
+          size_t t6 = between_( t2, t4, t5, position ) ? next_( t5, tour, position ) : previous_( t5, tour, position );
+          if ( t6 == t0 ) {
+            continue;
+          }
+          vector< size_t > t4t5( { t4, t5 } );
+          vector< size_t > t5t6( { t5, t6 } );
+          if ( find( removed.begin(), removed.end(), t4t5 ) != removed.end() ) {
+            continue;
+          }
+          if ( find( added.begin(), added.end(), t5t6 ) != added.end() ) {
+            continue;
+          }
+          double gain = g1 + g2 + distances[ t5 ][ t6 ] - distances[ t6 ][ t0 ];
+          if ( G + gain > bestGain ) {
+            bestGain = G + gain;
+            bestTs = { t0, t2, t3, t4, t5, t6 };
+          }
+
+          if ( G + g1 + g2 > bestG ) {
+            bestG = G + g1 + g2;
+            bestTsG = { t0, t2, t3, t4, t5, t6 };
+            nextT1 = t5;
+            nextT2 = t6;
+          }
         }
       }
-      for ( size_t t5index = 0; t5index < nearestNeighbors[ t4 ].size(); ++t5index ) {
-        size_t t5 = nearestNeighbors[ t4 ][ t5index ];
-        if ( t5 == previous_( t4, tour, position ) || t5 == next_( t4, tour, position ) ) {
-          continue;
-        }
-        double g2 = distances[ t3 ][ t4 ] - distances[ t4 ][ t5 ];
-        if ( g1 + g2 <= eps ) {
-          continue;
-        }
 
-        // Select t6 such that a valid tour is created
-        size_t t6 = between_( t2, t4, t5, position ) ? next_( t5, tour, position ) : previous_( t5, tour, position );
-        if ( t6 == t1 || t6 == t0 ) {
-          continue;
-        }
-        vector< size_t > t4t5( { t4, t5 } );
-        vector< size_t > t5t6( { t5, t6 } );
-        if ( find( removed.begin(), removed.end(), t4t5 ) != removed.end() ) {
-          continue;
-        }
-        if ( find( added.begin(), added.end(), t5t6 ) != added.end() ) {
-          continue;
-        }
-        double g3 = distances[ t5 ][ t6 ] - distances[ t6 ][ t0 ];
-        double gain = G + g1 + g2 + g3;
-        if ( gain > bestGain ) {
-          bestGain = gain;
-          bestTs = { t0, t2, t3, t4, t5, t6 };
-        }
-
-        if ( g1 + g2 > bestG ) {
-          bestG = g1 + g2;
-          bestTsG = { t0, t2, t3, t4, t5, t6 };
+      if ( false ) {
+        // Second choice of t4
+        size_t t4 = t2choice == 0 ? previous_( t3, tour, position ) : next_( t3, tour, position );
+        for ( size_t t5index = 0; t5index < nearestNeighbors[ t4 ].size(); ++t5index ) {
+          size_t t5 = nearestNeighbors[ t4 ][ t5index ];
+          if ( t5 == previous_( t4, tour, position ) || t5 == next_( t4, tour, position ) ) {
+            continue;
+          }
+          if ( ( t2choice == 0 && !between_( t3, t2, t5, position ) ) ||
+               ( t2choice == 1 && !between_( t2, t3, t5, position ) ) ) {
+            continue;
+          }
+          double g2 = distances[ t3 ][ t4 ] - distances[ t4 ][ t5 ];
+          if ( G + g1 + g2 <= eps ) {
+            continue;
+          }
+          // Only consider one choice of t6. The other choice is possible, but clutters the code and doesn't lead to a significant improvement.
+          size_t t6choice = t2choice;
+          size_t t6 = t6choice == 0 ? next_( t5, tour, position ) : previous_( t5, tour, position );
+          if ( t6 == t3 || t6 == t2 || t6 == t1 ) {
+            continue;
+          }
+          double gain = g1 + g2 + distances[ t5 ][ t6 ] - distances[ t6 ][ t1 ];
+          if ( G + gain > bestGain ) {
+            bestGain = G + gain;
+            bestTs = { t3, t4, t5, t6, t0, t2 };
+          }
+          if ( G + g1 + g2 > bestG ) {
+            bestG = G + g1 + g2;
+            bestTsG = { t3, t4, t5, t6, t0, t2 };
+            nextT1 = t5;
+            nextT2 = t6;
+          }
         }
       }
     }
-    if ( bestGain > 0.0 ) {
+
+    if ( bestGain > eps ) {
       performMove_( bestTs, tour, position );
-      added.insert( added.end(), { { bestTs[ 1 ], bestTs[ 2 ] }, { bestTs[ 2 ], bestTs[ 1 ] }, { bestTs[ 3 ], bestTs[ 4 ] }, { bestTs[ 4 ], bestTs[ 3 ] }, { bestTs[ 0 ], bestTs[ 5 ]}, { bestTs[ 5 ], bestTs[ 0 ] } } );
+      if ( bestTs.size() == 6 ) {
+        added.insert( added.end(), { { bestTs[ 1 ], bestTs[ 2 ] }, { bestTs[ 2 ], bestTs[ 1 ] }, { bestTs[ 3 ], bestTs[ 4 ] }, { bestTs[ 4 ], bestTs[ 3 ] }, { bestTs[ 0 ], bestTs[ 5 ]}, { bestTs[ 5 ], bestTs[ 0 ] } } );
+      }
+      else {
+        assert( bestTs.size() == 4 );
+        added.insert( added.end(), { { bestTs[ 1 ], bestTs[ 2 ] }, { bestTs[ 2 ], bestTs[ 1 ] }, { bestTs[ 3 ], bestTs[ 0 ] }, { bestTs[ 0 ], bestTs[ 3 ] } } );
+      }
       return true;
     }
-    if ( bestG > 0.0 ) {
+    if ( bestG > eps ) {
       performMove_( bestTsG, tour, position );
-      added.insert( added.end(), { { bestTsG[ 1 ], bestTsG[ 2 ] }, { bestTsG[ 2 ], bestTsG[ 1 ] }, { bestTsG[ 3 ], bestTsG[ 4 ] }, { bestTsG[ 4 ], bestTsG[ 3 ] }, { bestTsG[ 0 ], bestTsG[ 5 ]}, { bestTsG[ 5 ], bestTsG[ 0 ] } } );
-      removed.insert( removed.end(), { { bestTsG[ 2 ], bestTsG[ 3 ] }, { bestTsG[ 3 ], bestTsG[ 2 ] }, { bestTsG[ 4 ], bestTsG[ 5 ] }, { bestTsG[ 5 ], bestTsG[ 4 ] } } );
+      if ( bestTsG.size() == 6 ) {
+        added.insert( added.end(), { { bestTsG[ 1 ], bestTsG[ 2 ] }, { bestTsG[ 2 ], bestTsG[ 1 ] }, { bestTsG[ 3 ], bestTsG[ 4 ] }, { bestTsG[ 4 ], bestTsG[ 3 ] }, { bestTsG[ 0 ], bestTsG[ 5 ]}, { bestTsG[ 5 ], bestTsG[ 0 ] } } );
+        removed.insert( removed.end(), { { bestTsG[ 2 ], bestTsG[ 3 ] }, { bestTsG[ 3 ], bestTsG[ 2 ] }, { bestTsG[ 4 ], bestTsG[ 5 ] }, { bestTsG[ 5 ], bestTsG[ 4 ] } } );
+      }
+      else {
+        assert( bestTsG.size() == 4 );
+        added.insert( added.end(), { { bestTsG[ 1 ], bestTsG[ 2 ] }, { bestTsG[ 2 ], bestTsG[ 1 ] } } );
+        removed.insert( removed.end(), { { bestTsG[ 2 ], bestTsG[ 3 ] }, { bestTsG[ 3 ], bestTsG[ 2 ] } } );
+      }
+      t1 = nextT1;
+      t2 = nextT2;
       G = bestG;
-      t1 = bestTsG[ 4 ];
-      t2 = bestTsG[ 5 ];
       ++numberOfEdgesToRemove;
       positiveGain = true;
       continue;
     }
-
-    continue;
-
-    // Second choice of t4
-    /*t4 = t2choice == 0 ? previous_( t3, tour, position ) : next_( t3, tour, position );
-    for ( size_t t5index = 0; t5index < nearestNeighbors[ t4 ].size(); ++t5index ) {
-      size_t t5 = nearestNeighbors[ t4 ][ t5index ];
-      if ( t5 == previous_( t4, tour, position ) || t5 == next_( t4, tour, position ) ) {
-        continue;
-      }
-      if ( ( t2choice == 0 && !between_( t3, t2, t5, position ) ) ||
-           ( t2choice == 1 && !between_( t2, t3, t5, position ) ) ) {
-        continue;
-      }
-      double g2 = distances[ t3 ][ t4 ] - distances[ t4 ][ t5 ];
-      if ( g1 + g2 <= eps ) {
-        continue;
-      }
-      // Only consider one choice of t6. The other choice is possible, but clutters the code and doesn't lead to a significant improvement.
-      size_t t6choice = t2choice;
-      size_t t6 = t6choice == 0 ? next_( t5, tour, position ) : previous_( t5, tour, position );
-      if ( t6 == t3 || t6 == t2 || t6 == t1 ) {
-        continue;
-      }
-      double g3 = distances[ t5 ][ t6 ] - distances[ t6 ][ t1 ];
-      double gain = g1 + g2 + g3;
-      if ( gain > G ) {
-        G = gain;
-        bestTs = { t3, t4, t5, t6, t1, t2 };
-      }
-    }
-    */
   }
   return false;
 }
@@ -1070,7 +1098,7 @@ bool INLINE_ATTRIBUTE linKernighanOuterLoop_( vector< size_t >& tour,
               vector< vector< size_t > > removed( { { t1, t2 }, { t2, t1 }, { t3, t4 }, { t4, t3 }, { t5, t6 }, { t6, t5 } } );
               tour = tour2;
               position = position2;
-              if ( linKernighanInnerLoop_( tour,
+              if ( linKernighanInnerLoop2_( tour,
                                            position,
                                            added,
                                            removed,
@@ -1154,6 +1182,9 @@ vector< size_t > INLINE_ATTRIBUTE TravelingSalespersonProblemSolver::computeTour
   }
 
   cerr << "Greedy distance: " << getLength_( tourGreedy, distances ) << endl;
+  if ( distances.size() < 10 ) {
+    tour = getBruteForceTour_( distances );
+  }
 
   if ( true ) {
     cerr << "1-tree distance: ";
