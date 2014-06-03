@@ -11,7 +11,6 @@
 #include <fstream>
 #include <vector>
 
-#include "drill.h"
 #include "TravelingSalespersonProblemSolver.h"
 
 using namespace std;
@@ -30,6 +29,9 @@ double computeDistance( const vector< double >& point1, const vector< double >& 
 
 void testTSPRegular( size_t numOfPoints )
 {
+  size_t numOfPointsBefore = numOfPoints;
+  for ( size_t ii = 0; ii < 1; ++ii ) {
+    numOfPoints = numOfPointsBefore;
   vector< vector< double > > points;
   size_t rows = size_t( sqrt( double( numOfPoints ) ) );
   for ( size_t i = 0; i < rows; ++i ) {
@@ -44,6 +46,7 @@ void testTSPRegular( size_t numOfPoints )
     points.erase( points.begin() + ind );
   }
   numOfPoints = points.size();
+  cerr << "numPoints: " << numOfPoints << endl;
 
 
   vector< vector< double > > distances( numOfPoints + 1, vector< double >( numOfPoints + 1, 1e5 ) );
@@ -64,10 +67,12 @@ void testTSPRegular( size_t numOfPoints )
   size_t ii = find( path.begin(), path.end(), numOfPoints ) - path.begin();
   cerr << "First point: " << path[ ( ii + 1 ) % path.size() ] << " " << path[ ( ii + path.size() - 1 ) % path.size() ] << endl;
   cout << "CPU seconds to run test: " << setprecision( 4 ) << ( clock() - start ) / CLOCKS_PER_SEC << endl;;
+  }
 }
 
 void testTSPRandom( size_t numOfPoints )
 {
+  for ( size_t ii = 0; ii < 1; ++ii ) {
   vector< vector< double > > points( numOfPoints, vector< double >( 2 ) );
   for ( size_t i = 0; i < numOfPoints; ++i ) {
     points[ i ][ 0 ] = double( rand() ) / RAND_MAX;
@@ -86,29 +91,12 @@ void testTSPRandom( size_t numOfPoints )
   double start( clock() );
   vector< size_t > path = computeTour( distances );
   cout << "CPU seconds to run test: " << setprecision( 4 ) << ( clock() - start ) / CLOCKS_PER_SEC << endl;;
-}
-
-void testTSPDrill( int arg )
-{
-  vector< vector< double > > points = getDrill();
-  size_t numOfPoints = points.size();
-  vector< vector< double > > distances( numOfPoints, vector< double >( numOfPoints ) );
-  for ( size_t i = 0; i < numOfPoints; ++i ) {
-    for ( size_t j = i + 1; j < numOfPoints; ++j ) {
-      distances[ i ][ j ] = computeDistance( points[ i ], points[ j ] );
-      distances[ j ][ i ] = distances[ i ][ j ];
-    }
-    distances[ i ][ i ] = 0.0;
   }
-
-  cout << "Running test on random instance with " << numOfPoints << " points." << endl;
-  double start( clock() );
-  vector< size_t > path = computeTour( distances );
-  cout << "CPU seconds to run test: " << setprecision( 4 ) << ( clock() - start ) / CLOCKS_PER_SEC << endl;;
 }
 
 int main( int argc, const char* argv[] )
 {
+  srand( 1729 );
   bool standardTest = argc == 1;
   if ( standardTest ) {
     testTSPRandom( 50 );
@@ -119,7 +107,7 @@ int main( int argc, const char* argv[] )
   }
   else {
     if ( atoi( argv[ 1 ] ) == 1 ) {
-      testTSPDrill( atoi( argv[ 2 ] ) );
+      //testTSPDrill( atoi( argv[ 2 ] ) );
     }
     else {
       size_t numOfPoints = atoi( argv[ 2 ] );
