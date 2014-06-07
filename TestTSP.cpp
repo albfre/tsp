@@ -11,6 +11,7 @@
 #include <fstream>
 #include <vector>
 
+#include "drill.h"
 #include "TravelingSalespersonProblemSolver.h"
 
 using namespace std;
@@ -70,6 +71,25 @@ void testTSPRegular( size_t numOfPoints )
   }
 }
 
+void testTSPDrill( int arg )
+{
+  vector< vector< double > > points = getDrill();
+  size_t numOfPoints = points.size();
+  vector< vector< double > > distances( numOfPoints, vector< double >( numOfPoints ) );
+  for ( size_t i = 0; i < numOfPoints; ++i ) {
+    for ( size_t j = i + 1; j < numOfPoints; ++j ) {
+      distances[ i ][ j ] = computeDistance( points[ i ], points[ j ] );
+      distances[ j ][ i ] = distances[ i ][ j ];
+    }
+    distances[ i ][ i ] = 0.0;
+  }
+
+  cout << "Running test on random instance with " << numOfPoints << " points." << endl;
+  double start( clock() );
+  vector< size_t > path = computeTour( distances );
+  cout << "CPU seconds to run test: " << setprecision( 4 ) << ( clock() - start ) / CLOCKS_PER_SEC << endl;;
+}
+
 void testTSPRandom( size_t numOfPoints )
 {
   for ( size_t iii = 0; iii < 1; ++iii ) {
@@ -107,7 +127,7 @@ int main( int argc, const char* argv[] )
   }
   else {
     if ( atoi( argv[ 1 ] ) == 1 ) {
-      //testTSPDrill( atoi( argv[ 2 ] ) );
+      testTSPDrill( atoi( argv[ 2 ] ) );
     }
     else {
       size_t numOfPoints = atoi( argv[ 2 ] );
