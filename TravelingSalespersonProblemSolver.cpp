@@ -15,7 +15,7 @@
 #include "TravelingSalespersonProblemSolver.h"
 
 // For profiling
-#if 0
+#if 1
 #define INLINE_ATTRIBUTE __attribute__ ((noinline))
 #else
 #define INLINE_ATTRIBUTE
@@ -1004,6 +1004,7 @@ bool INLINE_ATTRIBUTE improveTourIterated_( bool ( *improveTour_ )( vector< size
                                             const vector< vector< double > >& distances,
                                             const vector< vector< size_t > >& nearestNeighbors )
 {
+  assert( tour.size() > 8 );
   bool change = false;
   vector< bool > dontLook( tour.size(), false );
   vector< size_t > bestTour( tour );
@@ -1145,6 +1146,7 @@ bool INLINE_ATTRIBUTE makesTour_( const vector< size_t >& ts, const vector< size
     incl[ ts[ i ] ] = ts[ i + 1 ];
     incl[ ts[ i + 1 ] ] = ts[ i ];
   }
+
   vector< size_t > visited;
   visited.reserve( ts.size() );
   size_t currentNode = ts.front();
@@ -1182,8 +1184,9 @@ bool INLINE_ATTRIBUTE kOptInnerLoop_( vector< size_t >& ts,
   assert( ts.size() > 1 );
   size_t ta = ts[ ts.size() - 2 ];
   size_t tb = ts[ ts.size() - 1 ];
-  vector< size_t > tcUntested = nearestNeighbors[ tb ];
+  vector< size_t > tcUntested( nearestNeighbors[ tb ] );
   vector< pair< size_t, size_t > > tcTdPairs;
+  tcTdPairs.reserve( tcUntested.size() * 2 );
   while ( tcUntested.size() > 0 ) {
     size_t tc = 0;
     size_t td = 0;
@@ -1247,7 +1250,6 @@ bool INLINE_ATTRIBUTE kOptInnerLoop_( vector< size_t >& ts,
       vector< size_t > tourCopy( tour );
       vector< size_t > positionCopy( position );
       performKOptMove_( ts, tour, position, distances );
-      vector< pair< size_t, size_t > > newRemoved( { make_pair( ts.front(), ts.back() ), make_pair( ts.back(), ts.front() ) } );
       vector< size_t > newTs( { ts.front(), ts.back() } );
       if ( kOptInnerLoop_( newTs, depth + 1, k, G + gn + distances[ tc ][ td ] - distances[ ts.front() ][ ts.back() ], added, removed, tour, position, dontLook, distances, nearestNeighbors, linKernighan ) ) {
         for ( size_t i = 0; i < ts.size(); ++i ) {
