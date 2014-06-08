@@ -92,6 +92,9 @@ void testTSPDrill( int arg )
 
 void testTSPRandom( size_t numOfPoints )
 {
+  for ( size_t i = 0; i < numOfPoints; ++i ) {
+    rand();
+  }
   for ( size_t iii = 0; iii < 1; ++iii ) {
   vector< vector< double > > points( numOfPoints, vector< double >( 2 ) );
   for ( size_t i = 0; i < numOfPoints; ++i ) {
