@@ -1112,17 +1112,35 @@ bool INLINE_ATTRIBUTE kOptInnerLoop_( vector< size_t >& ts,
                                       bool linKernighan )
 {
   const double eps = 1e-9;
+  assert( ts.size() == 2 * ( ( depth ) % k ) );
   assert( ts.size() > 1 );
   size_t ta = ts[ ts.size() - 2 ];
   size_t tb = ts[ ts.size() - 1 ];
   const vector< size_t >& tcUntested( nearestNeighbors[ tb ] );
   vector< pair< size_t, size_t > > tcTdPairs;
   tcTdPairs.reserve( tcUntested.size() * 2 );
-  for ( size_t tcindex = 0; tcindex < tcUntested.size(); ++tcindex ) {
-    size_t tcTmp = tcUntested[ tcindex ];
-    for ( size_t tdchoice = 0; tdchoice < 2; ++tdchoice ) {
-      size_t tdTmp = tdchoice == 0 ? previous_( tcTmp, tour, position ) : next_( tcTmp, tour, position );
-      tcTdPairs.push_back( make_pair( tcTmp, tdTmp ) );
+  for ( size_t tcIndex = 0; tcIndex < tcUntested.size(); ++tcIndex ) {
+    size_t tc = tcUntested[ tcIndex ];
+    if ( tc == next_( tb, tour, position ) || tc == previous_( tb, tour, position ) ) {
+      continue;
+    }
+    double gn = distances[ ta ][ tb ] - distances[ tb ][ tc ];
+    if ( G + gn < eps ) {
+      continue;
+    }
+    if ( find( removed.begin(), removed.end(), make_pair( tb, tc ) ) != removed.end() ) {
+      continue;
+    }
+    for ( size_t tdChoice = 0; tdChoice < 2; ++tdChoice ) {
+      size_t td = tdChoice == 0 ? previous_( tc, tour, position ) : next_( tc, tour, position );
+      // The added edge should not belong to T
+      if ( ( depth + 1 ) % k == 0 && find( added.begin(), added.end(), make_pair( tc, td ) ) != added.end() ) {
+        continue;
+      }
+      if ( find( removed.begin(), removed.end(), make_pair( tc, td ) ) != removed.end() ) {
+        continue;
+      }
+      tcTdPairs.push_back( make_pair( tc, td ) );
     }
   }
   sort( tcTdPairs.begin(), tcTdPairs.end(), [&] ( const pair< size_t, size_t >& p1, const pair< size_t, size_t >& p2 ) {
@@ -1133,31 +1151,13 @@ bool INLINE_ATTRIBUTE kOptInnerLoop_( vector< size_t >& ts,
     size_t td = tcTdPairs.back().second;
     tcTdPairs.pop_back();
 
-    // The added edge should not belong to T
-    if ( tc == next_( tb, tour, position ) || tc == previous_( tb, tour, position ) ) {
-      continue;
-    }
-    double gn = distances[ ta ][ tb ] - distances[ tb ][ tc ];
-    if ( G + gn < eps ) {
-      continue;
-    }
-    if ( ( depth + 1 ) % k == 0 && find( added.begin(), added.end(), make_pair( tc, td ) ) != added.end() ) {
-      continue;
-    }
-    if ( find( removed.begin(), removed.end(), make_pair( tb, tc ) ) != removed.end() ) {
-      continue;
-    }
-    if ( find( removed.begin(), removed.end(), make_pair( tc, td ) ) != removed.end() ) {
-      continue;
-    }
-    assert( ts.size() == 2 * ( ( depth ) % k ) );
-
     ts.push_back( tc );
     ts.push_back( td );
     added.push_back( make_pair( tb, tc ) );
     added.push_back( make_pair( tc, tb ) );
     removed.push_back( make_pair( tc, td ) );
     removed.push_back( make_pair( td, tc ) );
+    double gn = distances[ ta ][ tb ] - distances[ tb ][ tc ];
     if ( G + gn + distances[ tc ][ td ] - distances[ ts.front() ][ ts.back() ] > eps ) {
       if ( makesTour_( ts, tour, position ) ) {
         performKOptMove_( ts, tour, position, distances );
