@@ -1249,6 +1249,9 @@ bool INLINE_ATTRIBUTE kOptOuterLoop_( size_t k,
         bestG = 0.0;
         double gain = kOptInnerLoop_( 1, k, ts, G, added, removed, bestTs, bestG, tour, position, distances, nearestNeighbors );
         if ( gain > eps ) {
+        if ( lkDepth > 10 ) {
+          cerr << lkDepth << endl;
+        }
           performKOptMove_( ts, tour, position, distances );
           found = true;
           anyChange = true;
@@ -1279,7 +1282,7 @@ bool INLINE_ATTRIBUTE kOptOuterLoop_( size_t k,
           G = bestG + distances[ tc ][ td ] - distances[ ts.front() ][ ts.back() ];
           testChange = true;
         }
-      } while ( bestG > eps );
+      } while ( bestG > eps && lkDepth < 15 );
       if ( testChange ) {
         tour = tourCopy;
         position = positionCopy;
@@ -1347,6 +1350,9 @@ bool INLINE_ATTRIBUTE improveTourIterated_( bool ( *improveTour_ )( vector< size
   for ( size_t i = 0; i < iterations; ++i ) {
     while ( improveTour_( tour, dontLook, distances, nearestNeighbors ) ) {
       change = true;
+    }
+    if ( i + 1 == iterations ) {
+      break;
     }
     double length = getLength_( tour, distances );
     if ( length < bestLength ) {
@@ -1551,13 +1557,14 @@ vector< size_t > INLINE_ATTRIBUTE TravelingSalespersonProblemSolver::computeTour
   if ( true ) {
     tour = tourGreedy;
     double start( clock() );
-    //improveTourKOpt_( 5, true, tour, distances, nearestNeighbors10 );
-    improveTour3Opt_( tour, distances, nearestNeighbors30 );
-    improveTourIteratedLK5Opt_( 1, tour, distances, nearestNeighbors10 );
+//    improveTourKOpt_( 5, true, tour, distances, nearestNeighbors10 );
+    improveTourIteratedLK5Opt_( 100, tour, distances, nearestNeighbors5 );
     bool threeOpt = improveTour3Opt_( tour, distances, nearestNeighbors30 );
     bool doubleBridge = improveTourDoubleBridge_( tour, distances, nearestNeighbors10 );
     if ( threeOpt || doubleBridge ) {
-      improveTourIteratedLK5Opt_( 1, tour, distances, nearestNeighbors10 );
+      improveTourIteratedLK5Opt_( 10, tour, distances, nearestNeighbors10 );
+//      improveTourKOpt_( 5, true, tour, distances, nearestNeighbors10 );
+//      improveTourIteratedLK5Opt_( 1, tour, distances, nearestNeighbors10 );
      // improveTourLinKernighan_( tour, distances, nearestNeighbors10 );
       improveTour3Opt_( tour, distances, nearestNeighbors30 );
       improveTourDoubleBridge_( tour, distances, nearestNeighbors10 );
