@@ -118,6 +118,42 @@ void testTSPRandom( size_t numOfPoints )
   }
 }
 
+void testTSPRandomClusters( size_t numOfPoints )
+{
+  for ( size_t i = 0; i < numOfPoints; ++i ) {
+    rand();
+  }
+  for ( size_t iii = 0; iii < 1; ++iii ) {
+  vector< vector< double > > points;
+  points.reserve( numOfPoints );
+  size_t numOfClusters = min( size_t( ( rand() % 30 ) + 5 ), size_t( numOfPoints / 2 ) );
+  for ( size_t c = 0; c < numOfClusters; ++c ) {
+    vector< double > cluster( 2 );
+    cluster[ 0 ] = 10.0 * ( double( rand() ) / RAND_MAX );
+    cluster[ 1 ] = 10.0 * ( double( rand() ) / RAND_MAX );
+    for ( size_t i = 0; i * numOfClusters < numOfPoints; ++i ) {
+      points.push_back( vector< double >( 2 ) );
+      points.back()[ 0 ] = cluster[ 0 ] + double( rand() ) / RAND_MAX;
+      points.back()[ 1 ] = cluster[ 1 ] + double( rand() ) / RAND_MAX;
+    }
+  }
+  numOfPoints = points.size();
+  vector< vector< double > > distances( numOfPoints, vector< double >( numOfPoints ) );
+  for ( size_t i = 0; i < numOfPoints; ++i ) {
+    for ( size_t j = i + 1; j < numOfPoints; ++j ) {
+      distances[ i ][ j ] = computeDistance( points[ i ], points[ j ] );
+      distances[ j ][ i ] = distances[ i ][ j ];
+    }
+    distances[ i ][ i ] = 0.0;
+  }
+
+  cout << "Running test on random instance with " << numOfPoints << " points and " << numOfClusters << " clusters." << endl;
+  double start( clock() );
+  vector< size_t > path = computeTour( distances );
+  cout << "CPU seconds to run test: " << setprecision( 4 ) << ( clock() - start ) / CLOCKS_PER_SEC << endl;;
+  }
+}
+
 int main( int argc, const char* argv[] )
 {
   srand( 1729 );
@@ -130,12 +166,10 @@ int main( int argc, const char* argv[] )
     testTSPRandom( numOfPoints );
   }
   else {
-    if ( atoi( argv[ 1 ] ) == 1 ) {
-      testTSPDrill( atoi( argv[ 2 ] ) );
-    }
-    else {
-      size_t numOfPoints = atoi( argv[ 2 ] );
-      testTSPRegular( numOfPoints );
+    switch ( atoi( argv[ 1 ] ) ) {
+      case 0: testTSPRegular( atoi( argv[ 2 ] ) ); break;
+      case 1: testTSPDrill( atoi( argv[ 2 ] ) ); break;
+      case 2: testTSPRandomClusters( atoi( argv[ 2 ] ) ); break;
     }
   }
 }
