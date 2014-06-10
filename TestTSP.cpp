@@ -100,6 +100,7 @@ void testTSPRandom( size_t numOfPoints )
   for ( size_t i = 0; i < numOfPoints; ++i ) {
     points[ i ][ 0 ] = double( rand() ) / RAND_MAX;
     points[ i ][ 1 ] = double( rand() ) / RAND_MAX;
+//    cerr << points[ i ][ 0 ] << " " << points[ i ][ 1 ] << endl;
   }
   vector< vector< double > > distances( numOfPoints, vector< double >( numOfPoints ) );
   for ( size_t i = 0; i < numOfPoints; ++i ) {

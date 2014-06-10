@@ -233,6 +233,14 @@ vector< vector< size_t > > INLINE_ATTRIBUTE computeNearestNeighbors_( const vect
   return nearestNeighbors;
 }
 
+double INLINE_ATTRIBUTE getDistance( const vector< vector< double > >& distances,
+                                     const vector< double >& lagrangeMultipliers,
+                                     size_t i,
+                                     size_t j )
+{
+  return distances[ i ][ j ] + lagrangeMultipliers[ i ] + lagrangeMultipliers[ j ];
+}
+
 double INLINE_ATTRIBUTE compute1TreeLength_( vector< size_t >& vertexDegrees,
                                              const vector< vector< double > >& distances,
                                              const vector< double >& lagrangeMultipliers )
@@ -271,28 +279,28 @@ double INLINE_ATTRIBUTE compute1TreeLength_( vector< size_t >& vertexDegrees,
 
   double treeLength = 0.0;
   while ( unusedVertices.size() > 0 ) {
-    size_t fromIndex = 0;
-    vector< size_t >::iterator minIt = unusedVertices.begin();
+    size_t indexOfClosestTreeNode = 0;
+    vector< size_t >::iterator closestUnusedVertexIt = unusedVertices.begin();
     double minDistance = numeric_limits< double >::max();
     for ( vector< size_t >::iterator it = unusedVertices.begin(); it != unusedVertices.end(); ++it ) {
-      size_t mstIndex = closestTreeNode[ *it ];
-      double distance = distances[ mstIndex ][ *it ] + lagrangeMultipliers[ mstIndex ] + lagrangeMultipliers[ *it ];
+      size_t indexOfTreeNode = closestTreeNode[ *it ];
+      double distance = distances[ indexOfTreeNode ][ *it ] + lagrangeMultipliers[ indexOfTreeNode ] + lagrangeMultipliers[ *it ];
       if ( distance < minDistance ) {
         minDistance = distance;
-        fromIndex = mstIndex;
-        minIt = it;
+        indexOfClosestTreeNode = indexOfTreeNode;
+        closestUnusedVertexIt = it;
       }
     }
-    size_t indexOfNewTreeNode = *minIt;
     treeLength += minDistance;
-    ++vertexDegrees[ fromIndex ];
+    size_t indexOfNewTreeNode = *closestUnusedVertexIt;
+    ++vertexDegrees[ indexOfClosestTreeNode ];
     ++vertexDegrees[ indexOfNewTreeNode ];
-    *minIt = unusedVertices.back();
+    *closestUnusedVertexIt = unusedVertices.back();
     unusedVertices.pop_back();
 
     for ( vector< size_t >::iterator it = unusedVertices.begin(); it != unusedVertices.end(); ++it ) {
-      size_t mstIndex = closestTreeNode[ *it ];
-      double oldDistance = distances[ mstIndex ][ *it ] + lagrangeMultipliers[ mstIndex ] + lagrangeMultipliers[ *it ];
+      size_t indexOfTreeNode = closestTreeNode[ *it ];
+      double oldDistance = distances[ indexOfTreeNode ][ *it ] + lagrangeMultipliers[ indexOfTreeNode ] + lagrangeMultipliers[ *it ];
       double newDistance = distances[ indexOfNewTreeNode ][ *it ] + lagrangeMultipliers[ indexOfNewTreeNode ] + lagrangeMultipliers[ *it ];
       if ( newDistance < oldDistance ) {
         closestTreeNode[ *it ] = indexOfNewTreeNode;
@@ -319,10 +327,10 @@ double INLINE_ATTRIBUTE compute1TreeLength_( vector< size_t >& vertexDegrees,
   return treeLength - 2.0 * accumulate( lagrangeMultipliers.begin(), lagrangeMultipliers.end(), 0.0 );
 }
 
-double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >& distances )
+double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >& distances, vector< double >& lagrangeMultipliers )
 {
   double maxLength = -1e50;
-  vector< double > lagrangeMultipliers( distances.size() );
+  lagrangeMultipliers.assign( distances.size(), 0.0 );
   double lambda = 0.1;
   for ( size_t i = 0; i < 50; ++i ) {
     vector< size_t > vertexDegrees;
@@ -345,6 +353,170 @@ double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >
   }
 
   return maxLength;
+}
+
+double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >& distances )
+{
+  vector< double > lagrangeMultipliers( distances.size() );
+  return getHeldKarpLowerBound_( distances, lagrangeMultipliers );
+}
+
+struct Vertex {
+  Vertex( size_t idx ) : nodeIndex( idx ) {}
+  size_t nodeIndex;
+  size_t parentIndexInVertexList;
+};
+
+double INLINE_ATTRIBUTE compute1Tree_( vector< Vertex >& vertices,
+                                       vector< pair< size_t, size_t > >& edges,
+                                       vector< size_t >& vertexDegrees,
+                                       const vector< vector< double > >& distances,
+                                       const vector< double >& lagrangeMultipliers )
+{
+  vertices.clear();
+  vertices.reserve( distances.size() );
+  edges.clear();
+  edges.reserve( distances.size() );
+  vertexDegrees.assign( distances.size(), 0 );
+
+  // 1. Compute length of the minimum spanning tree excluding one vertex, using Prim's algorithm.
+
+  // Select the vertex with minimum maximal distances to a neighbor in
+  // order to allow for problems with artificial nodes (such as those used
+  // to construct Hamiltonian tours) with epsilon distance to all neighbors.
+  size_t minimaxVertex = 0;
+  double minimaxValue = *max_element( distances[ 0 ].begin(), distances[ 0 ].end() );
+  for ( size_t i = 1; i < distances.size(); ++i ) {
+    double value = *max_element( distances[ i ].begin(), distances[ i ].end() );
+    if ( value < minimaxValue ) {
+      minimaxValue = value;
+      minimaxVertex = i;
+    }
+  }
+
+  vertices.push_back( Vertex( minimaxVertex ) );
+
+  vector< size_t > unusedVertices;
+  unusedVertices.reserve( distances.size() - 1 );
+  for ( size_t i = 0; i < distances.size(); ++i ) {
+    if ( i != minimaxVertex ) {
+      unusedVertices.push_back( i );
+    }
+  }
+
+  // Popping one element means that it is added to the tree; add the root to the tree.
+  size_t rootVertex = unusedVertices.back();
+  unusedVertices.pop_back();
+  vertices.push_back( Vertex( rootVertex ) );
+
+  // For each unused vertex i, closestTreeNode[ i ] points to the vertex in the tree which is closest to i.
+  vector< size_t > closestTreeNode( distances.size(), 1 ); // 1 is index of rootVertex in vertex list
+
+  double treeLength = 0.0;
+  while ( unusedVertices.size() > 0 ) {
+    size_t indexOfClosestTreeNode = 0;
+    vector< size_t >::iterator closestUnusedVertexIt = unusedVertices.begin();
+    double minDistance = numeric_limits< double >::max();
+    for ( vector< size_t >::iterator it = unusedVertices.begin(); it != unusedVertices.end(); ++it ) {
+      size_t indexOfTreeNode = vertices[ closestTreeNode[ *it ] ].nodeIndex;
+      double distance = getDistance( distances, lagrangeMultipliers, indexOfTreeNode, *it );
+      if ( distance < minDistance ) {
+        minDistance = distance;
+        indexOfClosestTreeNode = indexOfTreeNode;
+        closestUnusedVertexIt = it;
+      }
+    }
+    treeLength += minDistance;
+    size_t indexOfNewTreeNode = *closestUnusedVertexIt;
+    ++vertexDegrees[ indexOfClosestTreeNode ];
+    ++vertexDegrees[ indexOfNewTreeNode ];
+    vertices.push_back( Vertex( indexOfNewTreeNode ) );
+    vertices.back().parentIndexInVertexList = closestTreeNode[ *closestUnusedVertexIt ];
+    edges.push_back( make_pair( indexOfClosestTreeNode, indexOfNewTreeNode ) );
+    *closestUnusedVertexIt = unusedVertices.back();
+    unusedVertices.pop_back();
+
+    for ( vector< size_t >::iterator it = unusedVertices.begin(); it != unusedVertices.end(); ++it ) {
+      size_t indexOfTreeNode = vertices[ closestTreeNode[ *it ] ].nodeIndex;
+      double oldDistance = getDistance( distances, lagrangeMultipliers, indexOfTreeNode, *it );
+      double newDistance = getDistance( distances, lagrangeMultipliers, indexOfNewTreeNode, *it );
+      if ( newDistance < oldDistance ) {
+        closestTreeNode[ *it ] = vertices.size() - 1;
+      }
+    }
+  }
+
+  // 2. Add the two shortest edges connecting to the first vertex
+  double minElement = numeric_limits< double >::max();
+  double secondMinElement = numeric_limits< double >::max();
+  size_t minElementIndex = 0;
+  size_t secondMinElementIndex = 0;
+  for ( size_t i = 0; i < distances[ minimaxVertex ].size(); ++i ) {
+    double value = getDistance( distances, lagrangeMultipliers, minimaxVertex, i );
+    if ( value < secondMinElement ) {
+      secondMinElement = value;
+      secondMinElementIndex = i;
+      if ( value < minElement ) {
+        secondMinElement = minElement;
+        secondMinElementIndex = minElementIndex;
+        minElement = value;
+        minElementIndex = i;
+      }
+    }
+  }
+  vertexDegrees[ minimaxVertex ] = 2;
+  edges.push_back( make_pair( minimaxVertex, secondMinElementIndex ) );
+  edges.push_back( make_pair( minimaxVertex, minElementIndex ) );
+
+  treeLength += minElement + secondMinElement;
+  return treeLength - 2.0 * accumulate( lagrangeMultipliers.begin(), lagrangeMultipliers.end(), 0.0 );
+}
+
+vector< vector< size_t > > INLINE_ATTRIBUTE computeHelsgaunNeighbors_( const vector< vector< double > >& distances,
+                                                                       size_t numberOfNeighbors )
+{
+  vector< Vertex > vertices;
+  vector< pair< size_t, size_t > > edges;
+  vector< size_t > vertexDegrees;
+  vector< double > lagrangeMultipliers( distances.size(), 0.0 );
+  getHeldKarpLowerBound_( distances, lagrangeMultipliers );
+  compute1Tree_( vertices,
+                 edges,
+                 vertexDegrees,
+                 distances,
+                 lagrangeMultipliers );
+
+  // insert (i,j) in T, this creates a cycle containing (i,j) in the spanning tree part of T. Then T(i,j) is obtained by removing the longest of the other edges in this cycle.
+  vector< vector< double > > beta( distances.size(), vector< double >( distances.size() ) );
+  for ( size_t i = 1; i < vertices.size(); ++i ) {
+    size_t iInd = vertices[ i ].nodeIndex;
+    beta[ iInd ][ iInd ] = numeric_limits< double >::lowest();
+    for ( size_t j = i + 1; j < vertices.size(); ++j ) {
+      size_t jInd = vertices[ j ].nodeIndex;
+      size_t jParentInd = vertices[ vertices[ j ].parentIndexInVertexList ].nodeIndex;
+      beta[ iInd ][ jInd ] = beta[ jInd ][ iInd ] = max( beta[ iInd ][ jParentInd ], getDistance( distances, lagrangeMultipliers, jInd, jParentInd ) );
+    }
+  }
+  vector< vector< double > > alphaDistances( distances.size(), vector< double >( distances.size() ) );
+  for ( size_t i = 0; i < beta.size(); ++i ) {
+    for ( size_t j = 0; j < beta[ i ].size(); ++j ) {
+      alphaDistances[ i ][ j ] = distances[ i ][ j ] - beta[ i ][ j ];
+    }
+  }
+
+  // if i or j has minimaxNode as end node, then T(i,j) is obtained from T by replacing the longest of the two edges of T incident to minimaxNode with (i,j)
+  double maxEdgeWeight = max( getDistance( distances, lagrangeMultipliers, edges[ edges.size() - 2 ].first, edges[ edges.size() - 2 ].second ),
+                              getDistance( distances, lagrangeMultipliers, edges[ edges.size() - 1 ].first, edges[ edges.size() - 1 ].second ) );
+  for ( size_t i = 0; i < distances.size(); ++i ) {
+    alphaDistances[ vertices.front().nodeIndex ][ i ] = alphaDistances[ i ][ vertices.front().nodeIndex ] = getDistance( distances, lagrangeMultipliers, i, vertices.front().nodeIndex ) - maxEdgeWeight;
+  }
+
+  // if (i,j) belongs to T, then T(i,j) is equal to T
+  for ( size_t i = 0; i < edges.size(); ++i ) {
+    alphaDistances[ edges[ i ].first ][ edges[ i ].second ] = alphaDistances[ edges[ i ].second ][ edges[ i ].first ] = 0.0;
+  }
+
+  return computeNearestNeighbors_( alphaDistances, numberOfNeighbors );
 }
 
 size_t INLINE_ATTRIBUTE previous_( size_t node, const vector< size_t >& tour, const vector< size_t >& position )
@@ -1459,16 +1631,30 @@ vector< size_t > INLINE_ATTRIBUTE TravelingSalespersonProblemSolver::computeTour
   vector< size_t > tour( tourGreedy );
   cerr << setprecision( 8 );
 
-  vector< vector< size_t > > nearestNeighbors;
-  vector< vector< size_t > > nearestNeighbors5;
-  vector< vector< size_t > > nearestNeighbors10;
-  vector< vector< size_t > > nearestNeighbors30;
+  vector< vector< size_t > > nearestNeighbors( distances.size() );
+  vector< vector< size_t > > nearestNeighbors5( distances.size() );
+  vector< vector< size_t > > nearestNeighbors10( distances.size() );
+  vector< vector< size_t > > nearestNeighbors30( distances.size() );
   {
     double start( clock() );
-    nearestNeighbors = computeNearestNeighbors_( distances, 20 );
-    nearestNeighbors30 = computeNearestNeighbors_( distances, 30 );
-    nearestNeighbors10 = computeNearestNeighbors_( distances, 10 );
-    nearestNeighbors5 = computeNearestNeighbors_( distances, 5 );
+    if ( true ) {
+      nearestNeighbors30 = computeNearestNeighbors_( distances, 30 );
+    }
+    else {
+      nearestNeighbors30 = computeHelsgaunNeighbors_( distances, 30 );
+    }
+    for ( size_t i = 0; i < distances.size(); ++i ) {
+      nearestNeighbors[ i ] = vector< size_t >( nearestNeighbors30[ i ].begin(), nearestNeighbors30[ i ].begin() + min( size_t( 20 ), nearestNeighbors30.size() ) );
+      nearestNeighbors10[ i ] = vector< size_t >( nearestNeighbors30[ i ].begin(), nearestNeighbors30[ i ].begin() + min( size_t( 10 ), nearestNeighbors30.size() ) );
+      nearestNeighbors5[ i ] = vector< size_t >( nearestNeighbors30[ i ].begin(), nearestNeighbors30[ i ].begin() + min( size_t( 5 ), nearestNeighbors30.size() ) );
+    }
+/*    for ( size_t i = 0; i < nearestNeighbors5.size(); ++i ) {
+      for ( size_t j = 0; j < nearestNeighbors5[ i ].size(); ++j ) {
+        cerr << nearestNeighbors5[ i ][ j ] << " ";
+      }
+      cerr << endl;
+    }
+    */
     double time( ( clock() - start ) / CLOCKS_PER_SEC );
     cerr << "Time to compute " << nearestNeighbors.front().size() << " nearest neighbors: " << time << endl;
   }
