@@ -659,9 +659,9 @@ bool INLINE_ATTRIBUTE improveTour2Opt_( vector< size_t >& tour,
         }
       }
       if ( maxGain > eps ) {
-        double lengthBefore = getLength_( tour, distances );
+//        double lengthBefore = getLength_( tour, distances );
         performMove_( bestTs, tour, position );
-        assert( getLength_( tour, distances ) < lengthBefore );
+//        assert( getLength_( tour, distances ) < lengthBefore );
         assertIsTour_( tour, position );
         anyChange = true;
         changed = true;
@@ -771,9 +771,9 @@ bool INLINE_ATTRIBUTE threeOptInnerLoop_( vector< size_t >& tour,
           dontLook[ bestTs[ i ] ] = false;
         }
       }
-      double lengthBefore = getLength_( tour, distances );
+//      double lengthBefore = getLength_( tour, distances );
       performMove_( bestTs, tour, position );
-      assert( getLength_( tour, distances ) < lengthBefore );
+//      assert( getLength_( tour, distances ) < lengthBefore );
       assertIsTour_( tour, position );
       found = true;
       changed = true;
@@ -887,9 +887,9 @@ bool INLINE_ATTRIBUTE doubleBridgeInnerLoop_( vector< size_t >& tour,
           dontLook[ bestTs[ i ] ] = false;
         }
       }
-      double lengthBefore = getLength_( tour, distances );
+//      double lengthBefore = getLength_( tour, distances );
       doubleBridgeSwap_( bestTs, tour, position );
-      assert( getLength_( tour, distances ) < lengthBefore );
+//      assert( getLength_( tour, distances ) < lengthBefore );
       assertIsTour_( tour, position );
       changed = true;
       found = true;
@@ -982,7 +982,7 @@ bool INLINE_ATTRIBUTE linKernighanInnerLoop_( vector< size_t >& tour,
       double gain = G + distances[ tc ][ td ] - distances[ td ][ t1 ];
       if ( gain > eps ) {
         added.insert( added.end(), { { t1, td }, { td, t1 } } );
-        assert( getLength_( tour, distances ) < lengthBefore );
+//        assert( getLength_( tour, distances ) < lengthBefore );
         assertIsTour_( tour, position );
         return true;
       }
@@ -1224,7 +1224,6 @@ void INLINE_ATTRIBUTE getPQI_( vector< size_t >& p,
   }
 }
 
-
 void INLINE_ATTRIBUTE performKOptMove_( const vector< size_t >& ts,
     vector< size_t >& tour,
     vector< size_t >& position,
@@ -1334,13 +1333,21 @@ double INLINE_ATTRIBUTE kOptInnerLoop_( size_t depth,
     if ( G + gn <= eps ) {
       continue;
     }
-    if ( find( removed.begin(), removed.end(), make_pair( tb, tc ) ) != removed.end() ) {
+    if ( depth + 1 < k && find( removed.begin(), removed.end(), make_pair( tb, tc ) ) != removed.end() ) {
       continue;
     }
     for ( size_t tdChoice = 0; tdChoice < 2; ++tdChoice ) {
       size_t td = tdChoice == 0 ? previous_( tc, tour, position ) : next_( tc, tour, position );
-      if ( depth + 1 == k && find( added.begin(), added.end(), make_pair( tc, td ) ) != added.end() ) {
-        continue;
+      if ( depth + 1 == k ) {
+        if ( G + gn + distances[ tc ][ td ] - distances[ ts.front() ][ td ] <= eps && G + gn <= bestG ) {
+          continue;
+        }
+        if ( find( added.begin(), added.end(), make_pair( tc, td ) ) != added.end() ) {
+          continue;
+        }
+        if ( find( removed.begin(), removed.end(), make_pair( tb, tc ) ) != removed.end() ) {
+          continue;
+        }
       }
       if ( find( removed.begin(), removed.end(), make_pair( tc, td ) ) != removed.end() ) {
         continue;
@@ -1348,7 +1355,8 @@ double INLINE_ATTRIBUTE kOptInnerLoop_( size_t depth,
       tcTdPairs.push_back( make_pair( tc, td ) );
     }
   }
-  sort( tcTdPairs.begin(), tcTdPairs.end(), [&] ( const pair< size_t, size_t >& p1, const pair< size_t, size_t >& p2 ) {
+  sort( tcTdPairs.begin(), tcTdPairs.end(), [&] ( const pair< size_t, size_t >& p1,
+                                                  const pair< size_t, size_t >& p2 ) {
     size_t tc1 = p1.first;
     size_t td1 = p1.second;
     size_t tc2 = p2.first;
@@ -1472,7 +1480,7 @@ bool INLINE_ATTRIBUTE kOptOuterLoop_( size_t k,
           G = bestG + distances[ tc ][ td ] - distances[ ts.front() ][ ts.back() ];
           testChange = true;
         }
-      } while ( bestG > eps && lkDepth < 15 );
+      } while ( bestG > eps && lkDepth < 20 );
       if ( testChange ) {
         tour = tourCopy;
         position = positionCopy;
@@ -1727,7 +1735,7 @@ vector< size_t > INLINE_ATTRIBUTE TravelingSalespersonProblemSolver::computeTour
     cerr << "LK    tour distance: " << getLength_( tour, distances ) << ", time: " << time << endl;
   }
 
-  if ( true ) {
+  if ( false ) {
     tour = tourGreedy;
     double start( clock() );
     improveTourIteratedLinKernighan_( 10, tour, distances, nearestNeighbors10 );
