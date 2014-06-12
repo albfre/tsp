@@ -25,7 +25,7 @@
 using namespace std;
 
 namespace {
-const double eps = 1e-9;
+const double tolerance = 1e-9;
 double INLINE_ATTRIBUTE getLength_( const vector< size_t >& tour,
                                     const vector< vector< double > >& distances )
 {
@@ -264,7 +264,7 @@ double INLINE_ATTRIBUTE compute1Tree_( vector< Vertex >& vertices,
 
   // Select the vertex with minimum maximal distances to a neighbor in
   // order to allow for problems with artificial nodes (such as those used
-  // to construct Hamiltonian tours) with epsilon distance to all neighbors.
+  // to construct Hamiltonian tours) with toleranceilon distance to all neighbors.
   size_t minimaxVertex = 0;
   double minimaxValue = *max_element( distances[ 0 ].begin(), distances[ 0 ].end() );
   for ( size_t i = 1; i < distances.size(); ++i ) {
@@ -575,7 +575,7 @@ bool INLINE_ATTRIBUTE improveTour2Opt_( vector< size_t >& tour,
           }
         }
       }
-      if ( maxGain > eps ) {
+      if ( maxGain > tolerance ) {
 //        double lengthBefore = getLength_( tour, distances );
         performMove_( bestTs, tour, position );
 //        assert( getLength_( tour, distances ) < lengthBefore );
@@ -613,7 +613,7 @@ bool INLINE_ATTRIBUTE threeOptInnerLoop_( vector< size_t >& tour,
           continue;
         }
         double g1 = distances[ t1 ][ t2 ] - distances[ t2 ][ t3 ];
-        if ( g1 <= eps ) {
+        if ( g1 <= tolerance ) {
           break;
         }
         // First choice of t4
@@ -635,7 +635,7 @@ bool INLINE_ATTRIBUTE threeOptInnerLoop_( vector< size_t >& tour,
             continue;
           }
           double g2 = distances[ t3 ][ t4 ] - distances[ t4 ][ t5 ];
-          if ( g1 + g2 <= eps ) {
+          if ( g1 + g2 <= tolerance ) {
             break;
           }
 
@@ -664,7 +664,7 @@ bool INLINE_ATTRIBUTE threeOptInnerLoop_( vector< size_t >& tour,
             continue;
           }
           double g2 = distances[ t3 ][ t4 ] - distances[ t4 ][ t5 ];
-          if ( g1 + g2 <= eps ) {
+          if ( g1 + g2 <= tolerance ) {
             break;
           }
           // Only consider one choice of t6. The other choice is possible, but clutters the code and doesn't lead to a significant improvement.
@@ -682,7 +682,7 @@ bool INLINE_ATTRIBUTE threeOptInnerLoop_( vector< size_t >& tour,
         }
       }
     }
-    if ( G > eps ) {
+    if ( G > tolerance ) {
       if ( dontLook.size() > 0 ) {
         for ( size_t i = 0; i < bestTs.size(); ++i ) {
           dontLook[ bestTs[ i ] ] = false;
@@ -777,7 +777,7 @@ bool INLINE_ATTRIBUTE doubleBridgeInnerLoop_( vector< size_t >& tour,
         continue;
       }
       double gainFirstBridge = distances[ t1 ][ t2 ] + distances[ t3 ][ t4 ] - distances[ t2 ][ t3 ] - distances[ t1 ][ t4 ];
-      if ( gainFirstBridge <= eps ) {
+      if ( gainFirstBridge <= tolerance ) {
         continue;
       }
 
@@ -798,7 +798,7 @@ bool INLINE_ATTRIBUTE doubleBridgeInnerLoop_( vector< size_t >& tour,
         }
       }
     }
-    if ( maxGain > eps ) {
+    if ( maxGain > tolerance ) {
       if ( dontLook.size() > 0 ) {
         for ( size_t i = 0; i < bestTs.size(); ++i ) {
           dontLook[ bestTs[ i ] ] = false;
@@ -877,7 +877,7 @@ bool INLINE_ATTRIBUTE linKernighanInnerLoop_( vector< size_t >& tour,
       tcUntested.pop_back();
 
       double gn = distances[ ta ][ tb ] - distances[ tb ][ tc ];
-      if ( G + gn <= eps ) {
+      if ( G + gn <= tolerance ) {
         continue;
       }
 
@@ -897,7 +897,7 @@ bool INLINE_ATTRIBUTE linKernighanInnerLoop_( vector< size_t >& tour,
 
       // If connecting back to t1 leads to an improvement, then take it!
       double gain = G + distances[ tc ][ td ] - distances[ td ][ t1 ];
-      if ( gain > eps ) {
+      if ( gain > tolerance ) {
         added.insert( added.end(), { { t1, td }, { td, t1 } } );
 //        assert( getLength_( tour, distances ) < lengthBefore );
         assertIsTour_( tour, position );
@@ -939,7 +939,7 @@ bool INLINE_ATTRIBUTE linKernighanOuterLoop_( vector< size_t >& tour,
           continue;
         }
         double g1 = distances[ t1 ][ t2 ] - distances[ t2 ][ t3 ];
-        if ( g1 <= eps ) {
+        if ( g1 <= tolerance ) {
           continue;
         }
 
@@ -949,7 +949,7 @@ bool INLINE_ATTRIBUTE linKernighanOuterLoop_( vector< size_t >& tour,
           performMove_( { t1, t2, t3, t4 }, tour, position );
           // Test for improving 2-opt move
           double gain = g1 + distances[ t3 ][ t4 ] - distances[ t4 ][ t1 ];
-          if ( gain > eps ) {
+          if ( gain > tolerance ) {
             assert( getLength_( tour, distances ) < lengthBefore );
             assertIsTour_( tour, position );
             return true;
@@ -1035,7 +1035,7 @@ bool INLINE_ATTRIBUTE linKernighanOuterLoop_( vector< size_t >& tour,
             }
 
             double g2 = distances[ t3 ][ t4 ] - distances[ t4 ][ t5 ];
-            if ( g1 + g2 <= eps ) {
+            if ( g1 + g2 <= tolerance ) {
               continue;
             }
             G = g1 + g2;
@@ -1200,26 +1200,29 @@ bool INLINE_ATTRIBUTE makesTour_( const vector< size_t >& ts, const vector< size
      */
 }
 
-/*bool INLINE_ATTRIBUTE removed_( const vector< size_t > ts, size_t ta, size_t tb ) {
+/*
+bool INLINE_ATTRIBUTE removed_( const vector< size_t > ts, size_t ta, size_t tb )
+{
   for ( size_t i = 0; i < ts.size(); i += 2 ) {
-  if ( ( ta == ts[ i ] && tb == ts[ i + 1 ] ) ||
-  ( ta == ts[ i + 1 ] && tb == ts[ i ] ) ) {
-  return true;
-  }
+    if ( ( ta == ts[ i ] && tb == ts[ i + 1 ] ) ||
+         ( ta == ts[ i + 1 ] && tb == ts[ i ] ) ) {
+      return true;
+    }
   }
   return false;
-  }
-
+}
+*/
+/*
   bool INLINE_ATTRIBUTE added_( const vector< size_t > ts, size_t ta, size_t tb ) {
   for ( size_t i = 1; i + 1 < ts.size(); i += 2 ) {
-  if ( ( ta == ts[ i ] && tb == ts[ i + 1 ] ) ||
-  ( ta == ts[ i + 1 ] && tb == ts[ i ] ) ) {
-  return true;
-  }
+    if ( ( ta == ts[ i ] && tb == ts[ i + 1 ] ) ||
+         ( ta == ts[ i + 1 ] && tb == ts[ i ] ) ) {
+      return true;
+    }
   }
   return false;
-  }
-  */
+}
+*/
 
 double INLINE_ATTRIBUTE kOptInnerLoop_( size_t depth,
                                         size_t k,
@@ -1242,27 +1245,21 @@ double INLINE_ATTRIBUTE kOptInnerLoop_( size_t depth,
   tcTdPairs.reserve( nearestNeighbors[ tb ].size() * 2 );
   for ( size_t tcIndex = 0; tcIndex < nearestNeighbors[ tb ].size(); ++tcIndex ) {
     size_t tc = nearestNeighbors[ tb ][ tcIndex ];
+    double gn = distances[ ta ][ tb ] - distances[ tb ][ tc ];
+    if ( G + gn <= tolerance ) {
+      continue;
+    }
     if ( tc == next_( tb, tour, position ) || tc == previous_( tb, tour, position ) ) {
       // The added edge should not belong to T
-      continue;
-    }
-    double gn = distances[ ta ][ tb ] - distances[ tb ][ tc ];
-    if ( G + gn <= eps ) {
-      continue;
-    }
-    if ( depth + 1 < k && find( removed.begin(), removed.end(), make_pair( tb, tc ) ) != removed.end() ) {
       continue;
     }
     for ( size_t tdChoice = 0; tdChoice < 2; ++tdChoice ) {
       size_t td = tdChoice == 0 ? previous_( tc, tour, position ) : next_( tc, tour, position );
       if ( depth + 1 == k ) {
-        if ( G + gn + distances[ tc ][ td ] - distances[ ts.front() ][ td ] <= eps && G + gn <= bestG ) {
+        if ( G + gn + distances[ tc ][ td ] - distances[ ts.front() ][ td ] <= tolerance && G + gn <= bestG ) {
           continue;
         }
         if ( find( added.begin(), added.end(), make_pair( tc, td ) ) != added.end() ) {
-          continue;
-        }
-        if ( find( removed.begin(), removed.end(), make_pair( tb, tc ) ) != removed.end() ) {
           continue;
         }
       }
@@ -1290,7 +1287,7 @@ double INLINE_ATTRIBUTE kOptInnerLoop_( size_t depth,
     ts.push_back( td );
     double gn = distances[ ta ][ tb ] - distances[ tb ][ tc ];
     double gain = G + gn + distances[ tc ][ td ] - distances[ ts.front() ][ ts.back() ];
-    if ( gain > eps && makesTour_( ts, tour, position ) ) {
+    if ( gain > tolerance && makesTour_( ts, tour, position ) ) {
       return gain;
     }
     if ( depth + 1 < k ) {
@@ -1310,20 +1307,17 @@ double INLINE_ATTRIBUTE kOptInnerLoop_( size_t depth,
                              position,
                              distances,
                              nearestNeighbors );
-      if ( gain > eps ) {
+      if ( gain > tolerance ) {
         return gain;
       }
-      removed.pop_back();
-      removed.pop_back();
-      added.pop_back();
-      added.pop_back();
+      removed.resize( removed.size() - 2 );
+      added.resize( added.size() - 2 );
     }
     else if ( G + gn > bestG && makesTour_( ts, tour, position ) ) {
       bestG = G + gn;
       bestTs = ts;
     }
-    ts.pop_back();
-    ts.pop_back();
+    ts.resize( ts.size() - 2 );
   }
   return -1.0;
 }
@@ -1363,7 +1357,7 @@ bool INLINE_ATTRIBUTE kOptOuterLoop_( size_t k,
         ++lkDepth;
         bestG = 0.0;
         double gain = kOptInnerLoop_( 1, k, ts, G, added, removed, bestTs, bestG, tour, position, distances, nearestNeighbors );
-        if ( gain > eps ) {
+        if ( gain > tolerance ) {
           if ( lkDepth > 10 ) {
 //            cerr << lkDepth << endl;
           }
@@ -1376,16 +1370,12 @@ bool INLINE_ATTRIBUTE kOptOuterLoop_( size_t k,
         if ( !linKernighan ) {
           break;
         }
-        if ( bestG > eps ) {
+        if ( bestG > tolerance ) {
           performKOptMove_( bestTs, tour, position, distances );
           ts = { bestTs.front(), bestTs.back() };
           tsHistory.insert( tsHistory.end(), bestTs.begin(), bestTs.end() );
           removed.clear();
           added.clear();
-          for ( size_t i = 0; i < tsHistory.size(); i += 2 ) {
-            removed.push_back( make_pair( tsHistory[ i ], tsHistory[ i + 1 ] ) );
-            removed.push_back( make_pair( tsHistory[ i + 1 ], tsHistory[ i ] ) );
-          }
           removed.push_back( make_pair( bestTs.front(), bestTs.back() ) );
           removed.push_back( make_pair( bestTs.back(), bestTs.front() ) );
           for ( size_t i = 1; i + 1 < tsHistory.size(); i += 2 ) {
@@ -1397,7 +1387,7 @@ bool INLINE_ATTRIBUTE kOptOuterLoop_( size_t k,
           G = bestG + distances[ tc ][ td ] - distances[ ts.front() ][ ts.back() ];
           testChange = true;
         }
-      } while ( bestG > eps && lkDepth < 20 );
+      } while ( bestG > tolerance && lkDepth < 20 );
       if ( testChange ) {
         tour = tourCopy;
         position = positionCopy;
