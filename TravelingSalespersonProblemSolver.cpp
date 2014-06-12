@@ -358,52 +358,6 @@ double INLINE_ATTRIBUTE compute1Tree_( vector< Vertex >& vertices,
   return treeLength - 2.0 * accumulate( lagrangeMultipliers.begin(), lagrangeMultipliers.end(), 0.0 );
 }
 
-vector< vector< size_t > > INLINE_ATTRIBUTE computeHelsgaunNeighbors_( const vector< vector< double > >& distances,
-                                                                       size_t numberOfNeighbors )
-{
-  vector< Vertex > vertices;
-  vector< pair< size_t, size_t > > edges;
-  vector< size_t > vertexDegrees;
-  vector< double > lagrangeMultipliers( distances.size(), 0.0 );
-  compute1Tree_( vertices,
-                 edges,
-                 vertexDegrees,
-                 distances,
-                 lagrangeMultipliers );
-
-  // insert (i,j) in T, this creates a cycle containing (i,j) in the spanning tree part of T. Then T(i,j) is obtained by removing the longest of the other edges in this cycle.
-  vector< vector< double > > beta( distances.size(), vector< double >( distances.size() ) );
-  for ( size_t i = 1; i < vertices.size(); ++i ) {
-    size_t iInd = vertices[ i ].nodeIndex;
-    beta[ iInd ][ iInd ] = numeric_limits< double >::lowest();
-    for ( size_t j = i + 1; j < vertices.size(); ++j ) {
-      size_t jInd = vertices[ j ].nodeIndex;
-      size_t jParentInd = vertices[ vertices[ j ].parentIndexInVertexList ].nodeIndex;
-      beta[ iInd ][ jInd ] = beta[ jInd ][ iInd ] = max( beta[ iInd ][ jParentInd ], getDistance_( distances, lagrangeMultipliers, jInd, jParentInd ) );
-    }
-  }
-  vector< vector< double > > alphaDistances( distances.size(), vector< double >( distances.size() ) );
-  for ( size_t i = 0; i < beta.size(); ++i ) {
-    for ( size_t j = 0; j < beta[ i ].size(); ++j ) {
-      alphaDistances[ i ][ j ] = distances[ i ][ j ] - beta[ i ][ j ];
-    }
-  }
-
-  // if i or j has minimaxNode as end node, then T(i,j) is obtained from T by replacing the longest of the two edges of T incident to minimaxNode with (i,j)
-  double maxEdgeWeight = max( getDistance_( distances, lagrangeMultipliers, edges[ edges.size() - 2 ].first, edges[ edges.size() - 2 ].second ),
-                              getDistance_( distances, lagrangeMultipliers, edges[ edges.size() - 1 ].first, edges[ edges.size() - 1 ].second ) );
-  for ( size_t i = 0; i < distances.size(); ++i ) {
-    alphaDistances[ vertices.front().nodeIndex ][ i ] = alphaDistances[ i ][ vertices.front().nodeIndex ] = getDistance_( distances, lagrangeMultipliers, i, vertices.front().nodeIndex ) - maxEdgeWeight;
-  }
-
-  // if (i,j) belongs to T, then T(i,j) is equal to T
-  for ( size_t i = 0; i < edges.size(); ++i ) {
-    alphaDistances[ edges[ i ].first ][ edges[ i ].second ] = alphaDistances[ edges[ i ].second ][ edges[ i ].first ] = 0.0;
-  }
-
-  return computeNearestNeighbors_( alphaDistances, numberOfNeighbors );
-}
-
 double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >& distances, vector< double >& lagrangeMultipliers )
 {
   double maxLength = numeric_limits< double >::lowest();
@@ -441,6 +395,53 @@ double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >
   return getHeldKarpLowerBound_( distances, lagrangeMultipliers );
 }
 
+vector< vector< size_t > > INLINE_ATTRIBUTE computeHelsgaunNeighbors_( const vector< vector< double > >& distances,
+                                                                       size_t numberOfNeighbors )
+{
+  vector< Vertex > vertices;
+  vector< pair< size_t, size_t > > edges;
+  vector< size_t > vertexDegrees;
+  vector< double > lagrangeMultipliers( distances.size(), 0.0 );
+  getHeldKarpLowerBound_( distances, lagrangeMultipliers );
+  compute1Tree_( vertices,
+                 edges,
+                 vertexDegrees,
+                 distances,
+                 lagrangeMultipliers );
+
+  // insert (i,j) in T, this creates a cycle containing (i,j) in the spanning tree part of T. Then T(i,j) is obtained by removing the longest of the other edges in this cycle.
+  vector< vector< double > > beta( distances.size(), vector< double >( distances.size() ) );
+  for ( size_t i = 1; i < vertices.size(); ++i ) {
+    size_t iInd = vertices[ i ].nodeIndex;
+    beta[ iInd ][ iInd ] = numeric_limits< double >::lowest();
+    for ( size_t j = i + 1; j < vertices.size(); ++j ) {
+      size_t jInd = vertices[ j ].nodeIndex;
+      size_t jParentInd = vertices[ vertices[ j ].parentIndexInVertexList ].nodeIndex;
+      beta[ iInd ][ jInd ] = beta[ jInd ][ iInd ] = max( beta[ iInd ][ jParentInd ], getDistance_( distances, lagrangeMultipliers, jInd, jParentInd ) );
+    }
+  }
+  vector< vector< double > > alphaDistances( distances.size(), vector< double >( distances.size() ) );
+  for ( size_t i = 0; i < beta.size(); ++i ) {
+    for ( size_t j = 0; j < beta[ i ].size(); ++j ) {
+      alphaDistances[ i ][ j ] = getDistance_( distances, lagrangeMultipliers, i, j ) - beta[ i ][ j ];
+    }
+  }
+
+  // if i or j has minimaxNode as end node, then T(i,j) is obtained from T by replacing the longest of the two edges of T incident to minimaxNode with (i,j)
+  double maxEdgeWeight = max( getDistance_( distances, lagrangeMultipliers, edges[ edges.size() - 2 ].first, edges[ edges.size() - 2 ].second ),
+                              getDistance_( distances, lagrangeMultipliers, edges[ edges.size() - 1 ].first, edges[ edges.size() - 1 ].second ) );
+  for ( size_t i = 0; i < distances.size(); ++i ) {
+    alphaDistances[ vertices.front().nodeIndex ][ i ] = alphaDistances[ i ][ vertices.front().nodeIndex ] = getDistance_( distances, lagrangeMultipliers, i, vertices.front().nodeIndex ) - maxEdgeWeight;
+  }
+  alphaDistances[ vertices.front().nodeIndex ][ vertices.front().nodeIndex ] = 0.0;
+
+  // if (i,j) belongs to T, then T(i,j) is equal to T
+  for ( size_t i = 0; i < edges.size(); ++i ) {
+    alphaDistances[ edges[ i ].first ][ edges[ i ].second ] = alphaDistances[ edges[ i ].second ][ edges[ i ].first ] = 0.0;
+  }
+
+  return computeNearestNeighbors_( alphaDistances, numberOfNeighbors );
+}
 
 size_t previous_( size_t node, const vector< size_t >& tour, const vector< size_t >& position )
 {
@@ -1456,20 +1457,20 @@ bool INLINE_ATTRIBUTE improveTourIterated_( function< bool ( vector< size_t >&,
       while ( improveTour( tour, dontLook, distances, nearestNeighbors ) ) {
         change = true;
       }
+
       vector< bool > dontLook4( tour.size(), false );
       while ( doubleBridgeInnerLoop_( tour, dontLook4, dontLook, distances, nearestNeighbors ) ) {
         change4 = true;
         change = true;
       }
     }
-    if ( i + 1 == iterations ) {
-      break;
-    }
-
     double length = getLength_( tour, distances );
     if ( length < bestLength ) {
       bestTour = tour;
       bestLength = length;
+    }
+    if ( i + 1 == iterations ) {
+      break;
     }
     tour = bestTour;
 
@@ -1569,7 +1570,7 @@ vector< size_t > INLINE_ATTRIBUTE TravelingSalespersonProblemSolver::computeTour
   vector< vector< size_t > > nearestNeighbors30( distances.size() );
   {
     double start( clock() );
-    if ( false ) {
+    if ( true ) {
       nearestNeighbors30 = computeNearestNeighbors_( distances, 30 );
       vector< vector< size_t > > helsgaun = computeHelsgaunNeighbors_( distances, 5 );
       for ( size_t i = 0; i < nearestNeighbors30.size(); ++i ) {
@@ -1686,7 +1687,29 @@ vector< size_t > INLINE_ATTRIBUTE TravelingSalespersonProblemSolver::computeTour
     cerr << "ILK   tour distance: " << getLength_( tour, distances ) << ", time: " << time << endl;
   }
 
-  for ( size_t k = 2; k < 6; ++k ) {
+  for ( size_t k = 5; k < 6; ++k ) {
+    if ( true ) {
+      tour = tourGreedy;
+      double start( clock() );
+      improveTourKOpt_( k, true, tour, distances, nearestNeighbors10 );
+      //improveTourIteratedLKH_( k, 20, true, tour, distances, nearestNeighbors10 );
+      improveTour3Opt_( tour, distances, nearestNeighbors30 );
+      improveTourDoubleBridge_( tour, distances, nearestNeighbors10 );
+      improveTour3Opt_( tour, distances, nearestNeighbors30 );
+      /*improveTourDoubleBridge_( tour, distances, nearestNeighbors10 );
+      improveTourDoubleBridge_( tour, distances, nearestNeighbors10 );
+      improveTourIteratedLKH_( k, 10, true, tour, distances, nearestNeighbors10 );
+      improveTour3Opt_( tour, distances, nearestNeighbors30 );
+      improveTourDoubleBridge_( tour, distances, nearestNeighbors10 );
+      improveTour3Opt_( tour, distances, nearestNeighbors30 );
+      improveTourIterated3Opt_( 1000, tour, distances, nearestNeighbors10 );
+      */
+      double time( ( clock() - start ) / CLOCKS_PER_SEC );
+      cerr << k << "-LK  tour distance: " << getLength_( tour, distances ) << ", time: " << time << endl;
+    }
+  }
+
+  for ( size_t k = 5; k < 6; ++k ) {
     if ( true ) {
       tour = tourGreedy;
       double start( clock() );
@@ -1704,7 +1727,7 @@ vector< size_t > INLINE_ATTRIBUTE TravelingSalespersonProblemSolver::computeTour
       improveTourIterated3Opt_( 1000, tour, distances, nearestNeighbors10 );
       */
       double time( ( clock() - start ) / CLOCKS_PER_SEC );
-      cerr << k << "-LK  tour distance: " << getLength_( tour, distances ) << ", time: " << time << endl;
+      cerr << k << "-ILK  tour distance: " << getLength_( tour, distances ) << ", time: " << time << endl;
     }
   }
 
