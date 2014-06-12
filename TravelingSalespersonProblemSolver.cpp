@@ -333,6 +333,9 @@ double INLINE_ATTRIBUTE compute1Tree_( vector< Vertex >& vertices,
   size_t minElementIndex = 0;
   size_t secondMinElementIndex = 0;
   for ( size_t i = 0; i < distances[ minimaxVertex ].size(); ++i ) {
+    if ( i == minimaxVertex ) {
+      continue;
+    }
     double value = getDistance_( distances, lagrangeMultipliers, minimaxVertex, i );
     if ( value < secondMinElement ) {
       secondMinElement = value;
@@ -346,6 +349,8 @@ double INLINE_ATTRIBUTE compute1Tree_( vector< Vertex >& vertices,
     }
   }
   vertexDegrees[ minimaxVertex ] = 2;
+  ++vertexDegrees[ secondMinElementIndex ];
+  ++vertexDegrees[ minElementIndex ];
   edges.push_back( make_pair( minimaxVertex, secondMinElementIndex ) );
   edges.push_back( make_pair( minimaxVertex, minElementIndex ) );
 
@@ -437,17 +442,17 @@ double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >
 }
 
 
-size_t INLINE_ATTRIBUTE previous_( size_t node, const vector< size_t >& tour, const vector< size_t >& position )
+size_t previous_( size_t node, const vector< size_t >& tour, const vector< size_t >& position )
 {
   return position[ node ] > 0 ? tour[ position[ node ] - 1 ] : tour.back();
 }
 
-size_t INLINE_ATTRIBUTE next_( size_t node, const vector< size_t >& tour, const vector< size_t >& position )
+size_t next_( size_t node, const vector< size_t >& tour, const vector< size_t >& position )
 {
   return position[ node ] + 1 < tour.size() ? tour[ position[ node ] + 1 ] : tour.front();
 }
 
-bool INLINE_ATTRIBUTE between_( size_t a, size_t b, size_t c, const vector< size_t >& position )
+bool between_( size_t a, size_t b, size_t c, const vector< size_t >& position )
 {
   return position[ a ] <= position[ c ] ? position[ a ] >= position[ b ] || position[ b ] >= position[ c ]
                                         : position[ b ] <= position[ a ] && position[ b ] >= position[ c ];
@@ -1278,10 +1283,10 @@ double INLINE_ATTRIBUTE kOptInnerLoop_( size_t depth,
   }
   sort( tcTdPairs.begin(), tcTdPairs.end(), [&] ( const pair< size_t, size_t >& p1,
                                                   const pair< size_t, size_t >& p2 ) {
-    size_t tc1 = p1.first;
-    size_t td1 = p1.second;
-    size_t tc2 = p2.first;
-    size_t td2 = p2.second;
+    const size_t tc1 = p1.first;
+    const size_t td1 = p1.second;
+    const size_t tc2 = p2.first;
+    const size_t td2 = p2.second;
     return distances[ tc1 ][ td1 ] - distances[ tb ][ tc1 ]
            < distances[ tc2 ][ td2 ] - distances[ tb ][ tc2 ];
   } );
@@ -1564,7 +1569,7 @@ vector< size_t > INLINE_ATTRIBUTE TravelingSalespersonProblemSolver::computeTour
   vector< vector< size_t > > nearestNeighbors30( distances.size() );
   {
     double start( clock() );
-    if ( true ) {
+    if ( false ) {
       nearestNeighbors30 = computeNearestNeighbors_( distances, 30 );
       vector< vector< size_t > > helsgaun = computeHelsgaunNeighbors_( distances, 5 );
       for ( size_t i = 0; i < nearestNeighbors30.size(); ++i ) {
