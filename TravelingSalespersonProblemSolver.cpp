@@ -758,16 +758,10 @@ void INLINE_ATTRIBUTE performKOptMove_( const vector< size_t >& ts,
 
 void INLINE_ATTRIBUTE performKOptMove_( const vector< size_t >& ts,
                                         vector< size_t >& tour,
-                                        vector< size_t >& position,
-                                        size_t doubleBridge = 0 )
+                                        vector< size_t >& position )
 {
   vector< size_t > p, q, incl;
   getPQI_( p, q, incl, ts, tour, position );
-  switch ( doubleBridge ) {
-    case 1: incl = { 5, 4, 7, 6, 1, 0, 3, 2 }; break;
-    case 2: incl = { 5, 4, 6, 7, 1, 0, 2, 3 }; break;
-    default: break;
-  }
   performKOptMove_( ts, incl, tour, position );
 }
 
@@ -782,23 +776,6 @@ bool INLINE_ATTRIBUTE makesTour_( const vector< size_t >& ts,
   size_t count = 1;
   for ( size_t i = ts.size(); ( i = ( q[ incl[ p[ i - 1 ] ] ] + 1 ) ^ 1 ) != 0; ++count );
   return 2 * count == ts.size();
-  /*
-     vector< size_t > visited;
-     visited.reserve( ts.size() );
-     size_t currentIndex = 0;
-     for ( size_t step = 0; step < ts.size() / 2; ++step ) {
-     currentIndex = incl[ currentIndex ];
-     visited.push_back( ts[ currentIndex ] );
-     size_t i = q[ currentIndex ];
-     currentIndex = i % 2 == 0 ? p[ i == 0 ? p.size() - 1 : i - 1 ]
-     : p[ i + 1 == p.size() ? 0 : i + 1 ];
-     visited.push_back( ts[ currentIndex ] );
-     }
-     sort( visited.begin(), visited.end() );
-     vector< size_t > tsCopy( ts );
-     sort( tsCopy.begin(), tsCopy.end() );
-     return visited == tsCopy;
-     */
 }
 
 bool INLINE_ATTRIBUTE makesTour_( const vector< size_t >& ts,
@@ -865,9 +842,7 @@ bool INLINE_ATTRIBUTE improveTour2Opt_( vector< size_t >& tour,
         }
       }
       if ( maxGain > tolerance ) {
-//        double lengthBefore = getLength_( tour, distances );
         performMove_( bestTs, tour, position );
-//        assert( getLength_( tour, distances ) < lengthBefore );
         assert( isTour_( tour, position ) );
         anyChange = true;
         changed = true;
@@ -876,131 +851,6 @@ bool INLINE_ATTRIBUTE improveTour2Opt_( vector< size_t >& tour,
   }
   return anyChange;
 }
-
-bool INLINE_ATTRIBUTE improveTour23_( vector< size_t >& tour,
-                                      vector< bool >& dontLook,
-                                      const vector< vector< double > >& distances,
-                                      const vector< vector< size_t > >& nearestNeighbors )
-{
-  vector< size_t > position( tour.size() );
-  for ( size_t i = 0; i < tour.size(); ++i ) {
-    position[ tour[ i ] ] = i;
-  }
-  for ( size_t t1 = 0; t1 < tour.size(); ++t1 ) {
-    for ( size_t t2choice = 0; t2choice < 2; ++t2choice  ) {
-      size_t t2 = t2choice == 0 ? previous_( t1, tour, position ) : next_( t1, tour, position );
-      double g0 = distances[ t1 ][ t2 ];
-      for ( size_t t3index = 0; t3index < nearestNeighbors[ t2 ].size(); ++t3index ) {
-        size_t t3 = nearestNeighbors[ t2 ][ t3index ];
-        double g1 = g0 - distances[ t2 ][ t3 ];
-        if ( g1 <= tolerance ) {
-          continue;
-        }
-        for ( size_t t4choice = 0; t4choice < 2; ++t4choice ) {
-          size_t t4 = t4choice == 0 ? previous_( t3, tour, position ) : next_( t3, tour, position );
-          if ( ( t3 == t2 && t4 == t1 ) || ( t4 == t1 && t3 == t2 ) ) {
-            continue;
-          }
-          double g2 = g1 + distances[ t3 ][ t4 ];
-          if ( g2 - distances[ t4 ][ t1 ] > tolerance && t2choice != t4choice ) {
-            vector< size_t > ts( { t1, t2, t3, t4 } );
-            if ( !dontLook.empty() ) {
-              for ( size_t i = 0; i < ts.size(); ++i ) {
-                dontLook[ ts[ i ] ] = false;
-              }
-            }
-            performKOptMove_( ts, tour, position );
-            return true;
-          }
-
-          for ( size_t t5index = 0; t5index < nearestNeighbors[ t4 ].size(); ++t5index ) {
-            size_t t5 = nearestNeighbors[ t4 ][ t5index ];
-            double g3 = g2 - distances[ t4 ][ t5 ];
-            if ( g3 <= tolerance ) {
-              continue;
-            }
-            for ( size_t t6choice = 0; t6choice < 2; ++t6choice ) {
-              size_t t6 = t6choice == 0 ? previous_( t5, tour, position ) : next_( t5, tour, position );
-              if ( ( t5 == t2 && t6 == t1 ) || ( t5 == t1 && t6 == t2 ) ||
-                   ( t5 == t3 && t6 == t4 ) || ( t5 == t4 && t6 == t3 ) ) {
-                continue;
-              }
-              double g4 = g3 + distances[ t5 ][ t6 ] - distances[ t6 ][ t1 ];
-              if ( g4 <= tolerance ) {
-                continue;
-              }
-              if ( makesTour_( { t1, t2, t3, t4, t5, t6 }, tour, position ) ) {
-                vector< size_t > ts( { t1, t2, t3, t4, t5, t6 } );
-                if ( !dontLook.empty() ) {
-                  for ( size_t i = 0; i < ts.size(); ++i ) {
-                    dontLook[ ts[ i ] ] = false;
-                  }
-                }
-                performKOptMove_( ts, tour, position );
-                return true;
-              }
-              vector< size_t > p, q, incl;
-              getPQI_( p, q, incl, { t1, t2, t3, t4, t5, t6 }, tour, position );
-              incl.push_back( 9 );
-              incl.push_back( 8 );
-              incl.push_back( 7 );
-              incl.push_back( 6 );
-              for ( size_t t7 = 0; t7 < tour.size(); ++t7 ) {
-                for ( size_t t8choice = 0; t8choice < 2; ++t8choice ) {
-                  size_t t8 = t8choice == 0 ? previous_( t7, tour, position ) : next_( t7, tour, position );
-                  if ( ( t7 == t1 && t8 == t2 ) ||
-                       ( t7 == t2 && t8 == t1 ) ||
-                       ( t7 == t3 && t8 == t4 ) ||
-                       ( t7 == t4 && t8 == t3 ) ||
-                       ( t7 == t5 && t8 == t6 ) ||
-                       ( t7 == t6 && t8 == t5 ) ) {
-                    continue;
-                  }
-                  for ( size_t t9index = 0; t9index < nearestNeighbors[ t8 ].size(); ++t9index ) {
-                    size_t t9 = nearestNeighbors[ t8 ][ t9index ];
-                    double g5 = g4 + distances[ t7 ][ t8 ] - distances[ t8 ][ t9 ];
-                    if ( g5 <= tolerance ) {
-                      continue;
-                    }
-                    for ( size_t t10choice = 0; t10choice < 2; ++t10choice ) {
-                      size_t t10 = t10choice == 0 ? previous_( t9, tour, position ) : next_( t9, tour, position );
-                      if ( ( t9 == t1 && t10 == t2 ) ||
-                           ( t9 == t2 && t10 == t1 ) ||
-                           ( t9 == t3 && t10 == t4 ) ||
-                           ( t9 == t4 && t10 == t3 ) ||
-                           ( t9 == t5 && t10 == t6 ) ||
-                           ( t9 == t6 && t10 == t5 ) ||
-                           ( t9 == t7 && t10 == t8 ) ||
-                           ( t9 == t8 && t10 == t7 ) ) {
-                        continue;
-                      }
-                      double g6 = g5 + distances[ t9 ][ t10 ] - distances[ t10 ][ t7 ];
-                      if ( g6 <= tolerance ) {
-                        continue;
-                      }
-                      if ( makesTour_( { t1, t2, t3, t4, t5, t6, t7, t8, t9, t10 }, tour, position, incl ) ) {
-                        vector< size_t > ts( { t1, t2, t3, t4, t5, t6, t7, t8, t9, t10 } );
-                        if ( !dontLook.empty() ) {
-                          for ( size_t i = 0; i < ts.size(); ++i ) {
-                            dontLook[ ts[ i ] ] = false;
-                          }
-                        }
-                        performKOptMove_( ts, incl, tour, position );
-                        return true;
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-  return false;
-}
-
 
 bool INLINE_ATTRIBUTE threeOptInnerLoop_( vector< size_t >& tour,
                                           vector< bool >& dontLook,
@@ -1050,7 +900,7 @@ bool INLINE_ATTRIBUTE threeOptInnerLoop_( vector< size_t >& tour,
           }
           double g2 = distances[ t3 ][ t4 ] - distances[ t4 ][ t5 ];
           if ( g1 + g2 <= tolerance ) {
-            break;
+            continue;
           }
 
           // Select t6 such that a valid tour is created
@@ -1079,7 +929,7 @@ bool INLINE_ATTRIBUTE threeOptInnerLoop_( vector< size_t >& tour,
           }
           double g2 = distances[ t3 ][ t4 ] - distances[ t4 ][ t5 ];
           if ( g1 + g2 <= tolerance ) {
-            break;
+            ;
           }
           // Only consider one choice of t6. The other choice is possible, but clutters the code and doesn't lead to a significant improvement.
           size_t t6choice = t2choice;
@@ -1102,9 +952,7 @@ bool INLINE_ATTRIBUTE threeOptInnerLoop_( vector< size_t >& tour,
           dontLook[ bestTs[ i ] ] = false;
         }
       }
-//      double lengthBefore = getLength_( tour, distances );
       performMove_( bestTs, tour, position );
-//      assert( getLength_( tour, distances ) < lengthBefore );
       assert( isTour_( tour, position ) );
       found = true;
       changed = true;
@@ -1128,54 +976,84 @@ bool INLINE_ATTRIBUTE improveTour3Opt_( vector< size_t >& tour,
   return change;
 }
 
-bool INLINE_ATTRIBUTE doubleBridgeInnerLoop_( vector< size_t >& tour,
-                                              vector< bool >& dontLook,
-                                              vector< bool >& otherDontLook,
-                                              const vector< vector< double > >& distances,
-                                              const vector< vector< size_t > >& nearestNeighbors )
+bool INLINE_ATTRIBUTE improveTour23InnerLoop_( vector< size_t >& tour,
+                                               vector< bool >& dontLook,
+                                               vector< bool >& otherDontLook,
+                                               const vector< vector< double > >& distances,
+                                               const vector< vector< size_t > >& nearestNeighbors )
 {
+  // Performs infeasible 2-opt moves followed by a 2- or 3-opt move.
+  // Includes double bridge moves
   vector< size_t > position( tour.size() );
   for ( size_t i = 0; i < tour.size(); ++i ) {
     position[ tour[ i ] ] = i;
   }
   bool changed = false;
   vector< size_t > bestTs;
-  size_t doubleBridgeType = 0;
   for ( size_t t1 = 0; t1 < tour.size(); ++t1 ) {
     if ( !dontLook.empty() && dontLook[ t1 ] ) {
       continue;
     }
     bool found = false;
-    size_t t2 = next_( t1, tour, position );
     double maxGain = 0.0;
+    vector< size_t > incl;
+    for ( size_t t2choice = 0; t2choice < 1; ++t2choice ) {
+      size_t t2 = t2choice == 0 ? next_( t1, tour, position ) : previous_( t1, tour, position );
 
-    for ( size_t t3index = 0; t3index < nearestNeighbors[ t2 ].size(); ++t3index ) {
-      size_t t3 = nearestNeighbors[ t2 ][ t3index ];
-      size_t t4 = next_( t3, tour, position );
-      if ( t3 == t1 || t4 == t1 ) {
-        continue;
-      }
-      double gainFirstBridge = distances[ t1 ][ t2 ] + distances[ t3 ][ t4 ] - distances[ t2 ][ t3 ] - distances[ t1 ][ t4 ];
-      if ( gainFirstBridge <= tolerance ) {
-        continue;
-      }
+      for ( size_t t3index = 0; t3index < nearestNeighbors[ t2 ].size(); ++t3index ) {
+        size_t t3 = nearestNeighbors[ t2 ][ t3index ];
+        size_t t4 = t2choice == 0 ? next_( t3, tour, position ) : previous_( t3, tour, position );
+        if ( t3 == t1 || t4 == t1 ) {
+          continue;
+        }
+        double gainFirstBridge = distances[ t1 ][ t2 ] + distances[ t3 ][ t4 ] - distances[ t2 ][ t3 ] - distances[ t1 ][ t4 ];
+        if ( gainFirstBridge <= tolerance ) {
+          continue;
+        }
 
-      for ( size_t t5 = t2; t5 != t3; t5 = next_( t5, tour, position  ) ) {
-        size_t t6 = next_( t5, tour, position );
-        for ( size_t t7index = 0; t7index < nearestNeighbors[ t6 ].size(); ++t7index ) {
-          size_t t7 = nearestNeighbors[ t6 ][ t7index ];
-          for ( size_t t8choice = 0; t8choice < 2; ++t8choice ) {
-            size_t t8 = t8choice == 0 ? next_( t7, tour, position ) : previous_( t7, tour, position );
-            if ( !between_( t4, t1, t7, position ) || !between_( t4, t1, t8, position ) ) {
+        for ( size_t t5 = t2; t5 != t3; t5 = t2choice == 0 ? next_( t5, tour, position ) : previous_( t5, tour, position ) ) {
+          for ( size_t t6choice = 0; t6choice < 1; ++t6choice ) {
+            size_t t6 = t6choice == 0 ? next_( t5, tour, position ) : previous_( t5, tour, position );
+            if ( t5 == t2 && t6 == t1 ) {
               continue;
             }
+            for ( size_t t7index = 0; t7index < nearestNeighbors[ t6 ].size(); ++t7index ) {
+              size_t t7 = nearestNeighbors[ t6 ][ t7index ];
+              for ( size_t t8choice = 0; t8choice < 2; ++t8choice ) {
+                size_t t8 = t8choice == 0 ? next_( t7, tour, position ) : previous_( t7, tour, position );
+                if ( !between_( t4, t1, t7, position ) || !between_( t4, t1, t8, position ) ) {
+                  continue;
+                }
+                double gainSecondBridge =
+                  t8choice == t6choice ? distances[ t5 ][ t6 ] + distances[ t7 ][ t8 ] - distances[ t6 ][ t7 ] - distances[ t5 ][ t8 ]
+                                       : distances[ t5 ][ t6 ] + distances[ t7 ][ t8 ] - distances[ t5 ][ t7 ] - distances[ t6 ][ t8 ];
+                if ( gainFirstBridge + gainSecondBridge > maxGain ) {
+                  maxGain = gainFirstBridge + gainSecondBridge;
+                  bestTs = { t1, t2, t3, t4, t5, t6, t7, t8 };
+                  if ( t8choice == t6choice ) {
+                    incl = { 3, 2, 1, 0, 7, 6, 5, 4 };
+                  }
+                  else {
+                    incl = { 3, 2, 1, 0, 6, 7, 4, 5 };
+                  }
+                }
 
-            double gainSecondBridge = t8choice == 0 ? distances[ t5 ][ t6 ] + distances[ t7 ][ t8 ] - distances[ t6 ][ t7 ] - distances[ t5 ][ t8 ]
-                                                    : distances[ t5 ][ t6 ] + distances[ t7 ][ t8 ] - distances[ t5 ][ t7 ] - distances[ t6 ][ t8 ];
-            if ( gainFirstBridge + gainSecondBridge > maxGain ) {
-              maxGain = gainFirstBridge + gainSecondBridge;
-              bestTs = { t1, t2, t5, t6, t3, t4, t7, t8 };
-              doubleBridgeType = t8choice == 0 ? 1 : 2;
+                for ( size_t t9index = 0; t9index < nearestNeighbors[ t8 ].size(); ++t9index ) {
+                  size_t t9 = nearestNeighbors[ t8 ][ t9index ];
+                  size_t t10 = t8choice == 0 ? previous_( t9, tour, position ) : next_( t9, tour, position );
+                  if ( !between_( t4, t1, t9, position ) || !between_( t4, t1, t10, position ) ) {
+                    continue;
+                  }
+
+                  double gain3 =
+                    distances[ t5 ][ t6 ] + distances[ t7 ][ t8 ] + distances[ t9 ][ t10 ] - distances[ t6 ][ t7 ] - distances[ t8 ][ t9 ] - distances[ t10 ][ t5 ];
+                  if ( gainFirstBridge + gain3 > maxGain ) {
+                    maxGain = gainFirstBridge + gain3;
+                    bestTs = { t1, t2, t3, t4, t5, t6, t7, t8, t9, t10 };
+                    incl = { 3, 2, 1, 0, 9, 6, 5, 8, 7, 4 };
+                  }
+                }
+              }
             }
           }
         }
@@ -1192,7 +1070,7 @@ bool INLINE_ATTRIBUTE doubleBridgeInnerLoop_( vector< size_t >& tour,
           otherDontLook[ bestTs[ i ] ] = false;
         }
       }
-      performKOptMove_( bestTs, tour, position, doubleBridgeType );
+      performKOptMove_( bestTs, incl, tour, position );
       assert( isTour_( tour, position ) );
       changed = true;
       found = true;
@@ -1204,9 +1082,9 @@ bool INLINE_ATTRIBUTE doubleBridgeInnerLoop_( vector< size_t >& tour,
   return changed;
 }
 
-bool INLINE_ATTRIBUTE improveTourDoubleBridge_( vector< size_t >& tour,
-                                                const vector< vector< double > >& distances,
-                                                const vector< vector< size_t > >& nearestNeighbors )
+bool INLINE_ATTRIBUTE improveTour23_( vector< size_t >& tour,
+                                      const vector< vector< double > >& distances,
+                                      const vector< vector< size_t > >& nearestNeighbors )
 {
   if ( tour.size() < 5 ) {
     return false;
@@ -1214,7 +1092,7 @@ bool INLINE_ATTRIBUTE improveTourDoubleBridge_( vector< size_t >& tour,
   bool change = false;
   vector< bool > dontLook( tour.size(), false );
   vector< bool > otherDontLook;
-  while ( doubleBridgeInnerLoop_( tour, dontLook, otherDontLook, distances, nearestNeighbors ) ) {
+  while ( improveTour23InnerLoop_( tour, dontLook, otherDontLook, distances, nearestNeighbors ) ) {
     change = true;
   }
   return change;
@@ -1286,7 +1164,6 @@ bool INLINE_ATTRIBUTE linKernighanInnerLoop_( vector< size_t >& tour,
       double gain = G + distances[ tc ][ td ] - distances[ td ][ t1 ];
       if ( gain > tolerance ) {
         added.insert( added.end(), { { t1, td }, { td, t1 } } );
-//        assert( getLength_( tour, distances ) < lengthBefore );
         assert( isTour_( tour, position ) );
         return true;
       }
@@ -1302,9 +1179,9 @@ bool INLINE_ATTRIBUTE linKernighanInnerLoop_( vector< size_t >& tour,
 }
 
 bool INLINE_ATTRIBUTE linKernighanOuterLoop_( vector< size_t >& tour,
-    vector< bool >& dontLook,
-    const vector< vector< double > >& distances,
-    const vector< vector< size_t > >& nearestNeighbors )
+                                              vector< bool >& dontLook,
+                                              const vector< vector< double > >& distances,
+                                              const vector< vector< size_t > >& nearestNeighbors )
 {
   vector< size_t > position( tour.size() );
   for ( size_t i = 0; i < tour.size(); ++i ) {
@@ -1513,22 +1390,21 @@ bool INLINE_ATTRIBUTE removed_( const vector< size_t > ts, size_t ta, size_t tb 
 }
 */
 
-double INLINE_ATTRIBUTE kOptInnerLoop_( size_t depth,
-                                        size_t k,
-                                        vector< size_t >& ts,
-                                        double G0,
-                                        vector< pair< size_t, size_t > >& added,
-                                        vector< pair< size_t, size_t > >& removed,
-                                        vector< size_t >& bestTs,
-                                        double& bestG,
-                                        vector< size_t >& bestInfeasibleTs,
-                                        double& bestInfeasibleG,
-                                        const vector< size_t >& tour,
-                                        const vector< size_t >& position,
-                                        const vector< vector< double > >& distances,
-                                        const vector< vector< size_t > >& nearestNeighbors )
+double INLINE_ATTRIBUTE bestKOptMove_( size_t depth,
+                                       size_t k,
+                                       vector< size_t >& ts,
+                                       double G0,
+                                       vector< pair< size_t, size_t > >& added,
+                                       vector< pair< size_t, size_t > >& removed,
+                                       vector< size_t >& bestTs,
+                                       double& bestG,
+                                       vector< size_t >& bestInfeasibleTs,
+                                       double& bestInfeasibleG,
+                                       const vector< size_t >& tour,
+                                       const vector< size_t >& position,
+                                       const vector< vector< double > >& distances,
+                                       const vector< vector< size_t > >& nearestNeighbors )
 {
-//  assert( ts.size() == 2 * depth );
   assert( ts.size() > 1 );
   const size_t tb = ts.back();
   vector< pair< size_t, size_t > > tcTdPairs;
@@ -1589,20 +1465,20 @@ double INLINE_ATTRIBUTE kOptInnerLoop_( size_t depth,
       added.push_back( make_pair( tc, tb ) );
       removed.push_back( make_pair( tc, td ) );
       removed.push_back( make_pair( td, tc ) );
-      gain = kOptInnerLoop_( depth + 1,
-                             k,
-                             ts,
-                             G2,
-                             added,
-                             removed,
-                             bestTs,
-                             bestG,
-                             bestInfeasibleTs,
-                             bestInfeasibleG,
-                             tour,
-                             position,
-                             distances,
-                             nearestNeighbors );
+      gain = bestKOptMove_( depth + 1,
+                            k,
+                            ts,
+                            G2,
+                            added,
+                            removed,
+                            bestTs,
+                            bestG,
+                            bestInfeasibleTs,
+                            bestInfeasibleG,
+                            tour,
+                            position,
+                            distances,
+                            nearestNeighbors );
       if ( gain > tolerance ) {
         return gain;
       }
@@ -1660,20 +1536,20 @@ bool INLINE_ATTRIBUTE kOptOuterLoop_( size_t k,
         ++lkDepth;
         bestG = tolerance;
         bestInfeasibleG = tolerance;
-        double gain = kOptInnerLoop_( 1,
-                                      k,
-                                      ts,
-                                      G0,
-                                      added,
-                                      removed,
-                                      bestTs,
-                                      bestG,
-                                      bestInfeasibleTs,
-                                      bestInfeasibleG,
-                                      tour,
-                                      position,
-                                      distances,
-                                      nearestNeighbors );
+        double gain = bestKOptMove_( 1,
+                                     k,
+                                     ts,
+                                     G0,
+                                     added,
+                                     removed,
+                                     bestTs,
+                                     bestG,
+                                     bestInfeasibleTs,
+                                     bestInfeasibleG,
+                                     tour,
+                                     position,
+                                     distances,
+                                     nearestNeighbors );
         if ( gain > tolerance ) {
           performKOptMove_( ts, tour, position );
           assert( isTour_( tour, position ) );
@@ -1747,11 +1623,7 @@ bool INLINE_ATTRIBUTE improveTourKOpt_( size_t k,
     }
 
     vector< bool > dontLook4( tour.size(), false );
-    while ( doubleBridgeInnerLoop_( tour, dontLook4, dontLook, distances, nearestNeighbors ) ) {
-      change4 = true;
-      change = true;
-    }
-    if ( false && !change4 && improveTour23_( tour, dontLook, distances, nearestNeighbors ) ) {
+    while ( improveTour23InnerLoop_( tour, dontLook4, dontLook, distances, nearestNeighbors ) ) {
       change4 = true;
       change = true;
     }
@@ -1782,7 +1654,7 @@ bool INLINE_ATTRIBUTE improveTourIterated_( function< bool ( vector< size_t >&,
       }
 
       vector< bool > dontLook4( tour.size(), false );
-      while ( doubleBridgeInnerLoop_( tour, dontLook4, dontLook, distances, nearestNeighbors ) ) {
+      while ( improveTour23InnerLoop_( tour, dontLook4, dontLook, distances, nearestNeighbors ) ) {
         change4 = true;
         change = true;
       }
@@ -1812,16 +1684,16 @@ bool INLINE_ATTRIBUTE improveTourIterated_( function< bool ( vector< size_t >&,
     sort( swapEdges.begin(), swapEdges.end() );
     size_t t1 = tour[ swapEdges[ 0 ] ];
     size_t t2 = next_( t1, tour, position );
-    size_t t3 = tour[ swapEdges[ 1 ] ];
-    size_t t4 = next_( t3, tour, position );
-    size_t t5 = tour[ swapEdges[ 2 ] ];
+    size_t t5 = tour[ swapEdges[ 1 ] ];
     size_t t6 = next_( t5, tour, position );
+    size_t t3 = tour[ swapEdges[ 2 ] ];
+    size_t t4 = next_( t3, tour, position );
     size_t t7 = tour[ swapEdges[ 3 ] ];
     size_t t8 = next_( t7, tour, position );
 
     vector< size_t > ts( { t1, t2, t3, t4, t5, t6, t7, t8 } );
-
-    performKOptMove_( ts, tour, position, 1 );
+    vector< size_t > incl( { 3, 2, 1, 0, 7, 6, 5, 4 } );
+    performKOptMove_( ts, incl, tour, position );
     for ( size_t i = 0; i < ts.size(); ++i ) {
       dontLook[ ts[ i ] ] = false;
     }
@@ -1969,9 +1841,9 @@ vector< size_t > INLINE_ATTRIBUTE TravelingSalespersonProblemSolver::computeTour
     tour = tourGreedy;
     double start( clock() );
     improveTour3Opt_( tour, distances, nearestNeighbors30 );
-    improveTourDoubleBridge_( tour, distances, nearestNeighbors );
+    improveTour23_( tour, distances, nearestNeighbors );
     improveTour3Opt_( tour, distances, nearestNeighbors30 );
-    improveTourDoubleBridge_( tour, distances, nearestNeighbors );
+    improveTour23_( tour, distances, nearestNeighbors );
     improveTour3Opt_( tour, distances, nearestNeighbors30 );
     double time( ( clock() - start ) / CLOCKS_PER_SEC );
     cerr << "4-opt tour distance: " << getLength_( tour, distances ) << ", time: " << time << endl;
@@ -1982,7 +1854,7 @@ vector< size_t > INLINE_ATTRIBUTE TravelingSalespersonProblemSolver::computeTour
     double start( clock() );
     improveTourKOpt_( 5, false, tour, distances, nearestNeighbors );
     improveTour3Opt_( tour, distances, nearestNeighbors30 );
-    improveTourDoubleBridge_( tour, distances, nearestNeighbors );
+    improveTour23_( tour, distances, nearestNeighbors );
     improveTour3Opt_( tour, distances, nearestNeighbors30 );
     double time( ( clock() - start ) / CLOCKS_PER_SEC );
     cerr << "5-opt tour distance: " << getLength_( tour, distances ) << ", time: " << time << endl;
@@ -1993,11 +1865,11 @@ vector< size_t > INLINE_ATTRIBUTE TravelingSalespersonProblemSolver::computeTour
     double start( clock() );
     improveTourLinKernighan_( tour, distances, nearestNeighbors10 );
     bool threeOpt = improveTour3Opt_( tour, distances, nearestNeighbors30 );
-    bool doubleBridge = improveTourDoubleBridge_( tour, distances, nearestNeighbors10 );
+    bool doubleBridge = improveTour23_( tour, distances, nearestNeighbors10 );
     if ( threeOpt || doubleBridge ) {
       improveTourLinKernighan_( tour, distances, nearestNeighbors10 );
       improveTour3Opt_( tour, distances, nearestNeighbors30 );
-      improveTourDoubleBridge_( tour, distances, nearestNeighbors10 );
+      improveTour23_( tour, distances, nearestNeighbors10 );
       improveTour3Opt_( tour, distances, nearestNeighbors30 );
     }
     double time( ( clock() - start ) / CLOCKS_PER_SEC );
@@ -2009,11 +1881,11 @@ vector< size_t > INLINE_ATTRIBUTE TravelingSalespersonProblemSolver::computeTour
     double start( clock() );
     improveTourIteratedLinKernighan_( 10, tour, distances, nearestNeighbors10 );
     bool threeOpt = improveTour3Opt_( tour, distances, nearestNeighbors30 );
-    bool doubleBridge = improveTourDoubleBridge_( tour, distances, nearestNeighbors10 );
+    bool doubleBridge = improveTour23_( tour, distances, nearestNeighbors10 );
     if ( threeOpt || doubleBridge ) {
       improveTourLinKernighan_( tour, distances, nearestNeighbors10 );
       improveTour3Opt_( tour, distances, nearestNeighbors30 );
-      improveTourDoubleBridge_( tour, distances, nearestNeighbors10 );
+      improveTour23_( tour, distances, nearestNeighbors10 );
       improveTour3Opt_( tour, distances, nearestNeighbors30 );
     }
     improveTourIterated3Opt_( 1000, tour, distances, nearestNeighbors10 );
@@ -2040,7 +1912,7 @@ vector< size_t > INLINE_ATTRIBUTE TravelingSalespersonProblemSolver::computeTour
       //improveTourKOpt_( k, true, tour, distances, nearestNeighbors10 );
       improveTourIteratedLKH_( k, 20, true, tour, distances, nearestNeighbors5 );
       improveTour3Opt_( tour, distances, nearestNeighbors30 );
-      improveTourDoubleBridge_( tour, distances, nearestNeighbors10 );
+      improveTour23_( tour, distances, nearestNeighbors10 );
       improveTour3Opt_( tour, distances, nearestNeighbors30 );
       /*improveTourDoubleBridge_( tour, distances, nearestNeighbors10 );
       improveTourDoubleBridge_( tour, distances, nearestNeighbors10 );
