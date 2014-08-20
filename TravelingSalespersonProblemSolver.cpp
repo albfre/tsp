@@ -1794,15 +1794,15 @@ vector< size_t > INLINE_ATTRIBUTE TravelingSalespersonProblemSolver::computeTour
   vector< vector< double > > helsgaunDistances;
   {
     double start( clock() );
-    nearestNeighbors30 = computeNearestNeighbors_( distances, 30 );
+    nearestNeighbors30 = computeNearestNeighbors_( distances, 10 );
     helsgaun10 = computeHelsgaunNeighbors_( distances, helsgaunDistances, 10 );
     if ( false ) {
       vector< size_t > helsgainInitialTour = getHelsgaunInitialTour_( nearestNeighbors30, helsgaunDistances, tourGreedy );
     }
     for ( size_t i = 0; i < distances.size(); ++i ) {
-      nearestNeighbors5[ i ] = vector< size_t >( nearestNeighbors30[ i ].begin(), nearestNeighbors30[ i ].begin() + min( size_t( 5 ), nearestNeighbors30.size() ) );
-      nearestNeighbors10[ i ] = vector< size_t >( nearestNeighbors30[ i ].begin(), nearestNeighbors30[ i ].begin() + min( size_t( 10 ), nearestNeighbors30.size() ) );
-      nearestNeighbors[ i ] = vector< size_t >( nearestNeighbors30[ i ].begin(), nearestNeighbors30[ i ].begin() + min( size_t( 20 ), nearestNeighbors30.size() ) );
+      nearestNeighbors5[ i ] = vector< size_t >( nearestNeighbors30[ i ].begin(), nearestNeighbors30[ i ].begin() + min( size_t( 5 ), nearestNeighbors30[ i ].size() ) );
+      nearestNeighbors10[ i ] = vector< size_t >( nearestNeighbors30[ i ].begin(), nearestNeighbors30[ i ].begin() + min( size_t( 10 ), nearestNeighbors30[ i ].size() ) );
+      nearestNeighbors[ i ] = vector< size_t >( nearestNeighbors30[ i ].begin(), nearestNeighbors30[ i ].begin() + min( size_t( 20 ), nearestNeighbors30[ i ].size() ) );
       helsgaun5[ i ] = vector< size_t >( helsgaun10[ i ].begin(), helsgaun10[ i ].begin() + min( size_t( 5 ), helsgaun10[ i ].size() ) );
     }
     for ( size_t i = 0; i < nearestNeighbors30.size(); ++i ) {
@@ -1887,7 +1887,7 @@ vector< size_t > INLINE_ATTRIBUTE TravelingSalespersonProblemSolver::computeTour
     cerr << "5-opt tour distance: " << getLength_( tour, distances ) << ", time: " << time << endl;
   }
 
-  if ( true ) {
+  if ( false ) {
     tour = tourGreedy;
     double start( clock() );
     improveTourIterated3Opt_( 1000, tour, distances, nearestNeighbors10 );
