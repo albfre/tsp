@@ -1794,7 +1794,7 @@ vector< size_t > INLINE_ATTRIBUTE TravelingSalespersonProblemSolver::computeTour
   vector< vector< double > > helsgaunDistances;
   {
     double start( clock() );
-    nearestNeighbors30 = computeNearestNeighbors_( distances, 10 );
+    nearestNeighbors30 = computeNearestNeighbors_( distances, 30 );
     helsgaun10 = computeHelsgaunNeighbors_( distances, helsgaunDistances, 10 );
     if ( false ) {
       vector< size_t > helsgainInitialTour = getHelsgaunInitialTour_( nearestNeighbors30, helsgaunDistances, tourGreedy );
