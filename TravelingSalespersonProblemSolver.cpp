@@ -25,6 +25,8 @@ using namespace std;
 
 namespace {
 const double tolerance = 1e-9;
+const bool useInfeasibleMoves = true;
+const size_t maxGainMoves = 30;
 
 vector< size_t > tour1, tour2;
 void updateNearest( const vector< size_t >& tour, vector< vector< size_t > >& nearest )
@@ -1543,7 +1545,7 @@ bool INLINE_ATTRIBUTE kOptOuterLoop_( size_t k,
       do {
         ++lkDepth;
         bestG = tolerance;
-        bestInfeasibleG = tolerance;
+        bestInfeasibleG = useInfeasibleMoves ? tolerance : numeric_limits< double >::max();
         double gain = bestKOptMove_( 1,
                                      k,
                                      ts,
@@ -1572,6 +1574,9 @@ bool INLINE_ATTRIBUTE kOptOuterLoop_( size_t k,
         }
         if ( !linKernighan ) {
           break;
+        }
+        if ( !useInfeasibleMoves ) {
+          bestInfeasibleG = numeric_limits< double >::lowest();
         }
         if ( bestG > tolerance ) {
           performKOptMove_( bestTs, tour, position );
@@ -1602,7 +1607,7 @@ bool INLINE_ATTRIBUTE kOptOuterLoop_( size_t k,
             added.push_back( make_pair( ts[ i + 1 ], ts[ i ] ) );
           }
         }
-      } while ( ( bestG > tolerance && lkDepth < 30 ) || ( bestInfeasibleG > tolerance && ts.size() < 2 * k + 1 ) );
+      } while ( ( bestG > tolerance && lkDepth < maxGainMoves ) || ( bestInfeasibleG > tolerance && ts.size() < 2 * k + 1 ) );
       if ( testChange ) {
         tour = tourCopy;
         position = positionCopy;
@@ -1625,20 +1630,18 @@ bool INLINE_ATTRIBUTE improveTourKOpt_( size_t k,
   vector< bool > dontLook( tour.size(), false );
   bool change = false;
   bool change4 = true;
-  vector< vector< size_t > > nnn( nearestNeighbors );
   while ( change4 ) {
     change4 = false;
-    while ( kOptOuterLoop_( k, tour, dontLook, distances, nnn, linKernighan ) ) {
+    while ( kOptOuterLoop_( k, tour, dontLook, distances, nearestNeighbors, linKernighan ) ) {
       change = true;
     }
 
     vector< bool > dontLook4( tour.size(), false );
-   while ( improveTour23InnerLoop_( tour, dontLook4, dontLook, distances, nnn ) ) {
+   while ( improveTour23InnerLoop_( tour, dontLook4, dontLook, distances, nearestNeighbors ) ) {
       cerr << "update" << endl;
       change4 = true;
       change = true;
     }
-    updateNearest( tour, nnn );
   }
   return change;
 }
@@ -1934,6 +1937,7 @@ vector< size_t > INLINE_ATTRIBUTE TravelingSalespersonProblemSolver::computeTour
       double start( clock() );
       vector< vector< size_t > > nn( nearestNeighbors5 );
       improveTourKOpt_( k, true, tour, distances, nn );
+      updateNearest( tour, nn );
 
       double time( ( clock() - start ) / CLOCKS_PER_SEC );
       cerr << k << "-LK  tour distance: " << getLength_( tour, distances ) << ", time: " << time << endl;
