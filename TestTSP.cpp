@@ -12,7 +12,6 @@
 #include <vector>
 
 #include "hex3000.h"
-#include "drill.h"
 #include "TravelingSalespersonProblemSolver.h"
 
 using namespace std;
