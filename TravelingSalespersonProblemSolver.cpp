@@ -26,10 +26,13 @@ using namespace std;
 namespace {
 const double tolerance = 1e-9;
 const bool useInfeasibleMoves = true;
-const size_t maxGainMoves = 30;
+const size_t maxGainMoves = 1000;
 
-vector< size_t > tour1, tour2;
-void updateNearest( const vector< size_t >& tour, vector< vector< size_t > >& nearest )
+// Updates the nearest neighbor matrix on the basis of two previous tours
+void updateNearest( const vector< size_t >& tour,
+                    vector< size_t >& tour1,
+                    vector< size_t >& tour2,
+                    vector< vector< size_t > >& nearest )
 {
   tour2 = tour1;
   tour1 = tour;
@@ -343,17 +346,20 @@ vector< vector< size_t > > INLINE_ATTRIBUTE computeNearestNeighbors_( const vect
                                                                       size_t numberOfNeighbors )
 {
   numberOfNeighbors = min( numberOfNeighbors, distances.size() - 1 );
+  assert( numberOfNeighbors > 0 );
   vector< vector< size_t > > nearestNeighbors( distances.size(), vector< size_t >( numberOfNeighbors ) );
   set< pair< double, size_t > > tmpNeighbors;
   for ( size_t i = 0; i < distances.size(); ++i ) {
     tmpNeighbors.clear();
+    double worstNearNeighbor = numeric_limits< double >::max();
     for ( size_t j = 0; j < distances[ i ].size(); ++j ) {
-      if( j != i ) {
-        if ( tmpNeighbors.size() < numberOfNeighbors || distances[ i ][ j ] < tmpNeighbors.rbegin()->first ) {
+      if ( j != i ) {
+        if ( tmpNeighbors.size() < numberOfNeighbors || distances[ i ][ j ] < worstNearNeighbor ) {
           if ( tmpNeighbors.size() >= numberOfNeighbors ) {
             set< pair< double, size_t > >::iterator itLast = tmpNeighbors.end();
             --itLast;
             tmpNeighbors.erase( itLast );
+            worstNearNeighbor = tmpNeighbors.rbegin()->first;
           }
           tmpNeighbors.insert( make_pair( distances[ i ][ j ], j ) );
         }
@@ -361,7 +367,6 @@ vector< vector< size_t > > INLINE_ATTRIBUTE computeNearestNeighbors_( const vect
     }
     set< pair< double, size_t > >::const_iterator it = tmpNeighbors.begin();
     for ( size_t j = 0; j < numberOfNeighbors; ++j, ++it ) {
-      // Take neighbor j + 1 in order to avoid adding self as neighbor
       nearestNeighbors[ i ][ j ] = it->second;
     }
   }
@@ -496,16 +501,21 @@ double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >
 {
   double maxLength = numeric_limits< double >::lowest();
   lagrangeMultipliers.assign( distances.size(), 0.0 );
+  vector< double > localLagrangeMultipliers( lagrangeMultipliers );
   vector< Vertex > vertices;
   vector< pair< size_t, size_t > > edges;
   vector< size_t > vertexDegrees;
   double lambda = 0.1;
     for ( size_t i = 0; i < 50; ++i ) {
       vector< size_t > vertexDegrees;
-      double treeLength = compute1Tree_( vertices, edges, vertexDegrees, distances, lagrangeMultipliers );
-      maxLength = max( maxLength, treeLength );
+      double treeLength = compute1Tree_( vertices, edges, vertexDegrees, distances, localLagrangeMultipliers );
+      if ( treeLength > maxLength ) {
+        maxLength = treeLength;
+        lagrangeMultipliers = localLagrangeMultipliers;
+      }
+
       double denominator = 0.0;
-      for ( size_t j = 0; j < lagrangeMultipliers.size(); ++j ) {
+      for ( size_t j = 0; j < localLagrangeMultipliers.size(); ++j ) {
         double d = double( vertexDegrees[ j ] ) - 2.0;
         denominator += d * d;
       }
@@ -514,8 +524,8 @@ double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >
       }
       double t = 2.0 * lambda * treeLength / denominator;
 
-      for ( size_t j = 0; j < lagrangeMultipliers.size(); ++j ) {
-        lagrangeMultipliers[ j ] += t * ( int( vertexDegrees[ j ] ) - 2 );
+      for ( size_t j = 0; j < localLagrangeMultipliers.size(); ++j ) {
+        localLagrangeMultipliers[ j ] += t * ( int( vertexDegrees[ j ] ) - 2 );
       }
       lambda = 1.0 / ( 20.0 + 10 * i );
     }
@@ -594,101 +604,6 @@ double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >
                                           : position[ b ] <= position[ a ] && position[ b ] >= position[ c ];
   }
 
-  void INLINE_ATTRIBUTE flip_( vector< size_t >& tour,
-                               vector< size_t >& position,
-                               size_t t1,
-                               size_t t2,
-                               size_t t3,
-                               size_t t4 )
-  {
-
-    if ( !( t2 == next_( t1, tour, position ) && t3 == next_( t4, tour, position ) ) ) {
-      cerr << "t: " << t1 << " " << t2 << " " << t3 << " " << t4 << endl;
-      cerr << "tpos: " << position[ t2 ] << " " << position[ t1 ] << " " << position[ t3 ] << " " << position[ t4 ] << endl;
-    }
-    assert( t2 == next_( t1, tour, position ) );
-    assert( t3 == next_( t4, tour, position ) );
-    size_t pt2 = position[ t2 ];
-    size_t pt3 = position[ t3 ];
-
-    if ( pt3 < pt2 ) {
-      swap( pt2, pt3 );
-    }
-    if ( pt3 - pt2 <= tour.size() - pt3 + pt2 ) {
-      reverse( tour.begin() + pt2, tour.begin() + pt3 );
-    }
-    else {
-      vector< size_t >::iterator iIt = tour.begin() + pt3;
-      vector< size_t >::iterator jIt = tour.begin() + pt2;
-      while ( iIt != tour.end() && jIt != tour.begin() ) {
-        --jIt;
-        iter_swap( iIt, jIt );
-        ++iIt;
-      }
-      if ( iIt == tour.end() ) {
-        reverse( tour.begin(), jIt );
-      }
-      else {
-        reverse( iIt, tour.end() );
-      }
-    }
-    for ( size_t i = 0; i < tour.size(); ++i ) {
-      position[ tour[ i ] ] = i;
-    }
-  }
-
-  void INLINE_ATTRIBUTE performMove_( const vector< size_t >& ts,
-                                      vector< size_t >& tour,
-                                      vector< size_t >& position )
-  {
-    assert( ts.size() == 4 || ts.size() == 6 );
-    if ( ts.size() == 4 ) {
-      size_t t1 = ts[ 0 ];
-      size_t t2 = ts[ 1 ];
-      size_t t3 = ts[ 2 ];
-      size_t t4 = ts[ 3 ];
-      if ( t1 == next_( t2, tour, position ) ) {
-        swap( t1, t2 );
-      }
-      if ( t4 == next_( t3, tour, position ) ) {
-        swap( t3, t4 );
-      }
-      flip_( tour, position, t1, t2, t3, t4 );
-    }
-    else {
-      size_t t1 = ts[ 0 ];
-      size_t t2 = ts[ 1 ];
-      size_t t3 = ts[ 2 ];
-      size_t t4 = ts[ 3 ];
-      size_t t5 = ts[ 4 ];
-      size_t t6 = ts[ 5 ];
-
-      if ( t1 == next_( t2, tour, position ) ) {
-        swap( t1, t2 );
-      }
-      if ( t4 == next_( t3, tour, position ) ) {
-        swap( t3, t4 );
-      }
-      flip_( tour, position, t1, t2, t3, t4 );
-
-      t1 = ts[ 0 ];
-      t4 = ts[ 3 ];
-      t5 = ts[ 4 ];
-      t6 = ts[ 5 ];
-
-      t2 = ts[ 1 ];
-      t3 = ts[ 2 ];
-
-      if ( t1 == next_( t4, tour, position ) ) {
-        swap( t1, t4 );
-      }
-      if ( t6 == next_( t5, tour, position ) ) {
-        swap( t5, t6 );
-      }
-      flip_( tour, position, t1, t4, t5, t6 );
-    }
-  }
-
   void INLINE_ATTRIBUTE getPQI_( vector< size_t >& p,
                                  vector< size_t >& q,
                                  vector< size_t >& incl,
@@ -730,12 +645,11 @@ double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >
 
   void INLINE_ATTRIBUTE performKOptMove_( const vector< size_t >& ts,
                                           const vector< size_t >& incl,
+                                          const vector< size_t >& p,
+                                          const vector< size_t >& q,
                                           vector< size_t >& tour,
                                           vector< size_t >& position )
   {
-    vector< size_t > p, q, inclTmp;
-    getPQI_( p, q, inclTmp, ts, tour, position );
-
     vector< size_t > tourCopy( tour );
     size_t index = 0;
     size_t currentIndex = 0;
@@ -760,12 +674,22 @@ double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >
   }
 
   void INLINE_ATTRIBUTE performKOptMove_( const vector< size_t >& ts,
+                                          const vector< size_t >& incl,
+                                          vector< size_t >& tour,
+                                          vector< size_t >& position )
+  {
+    vector< size_t > p, q, inclTmp;
+    getPQI_( p, q, inclTmp, ts, tour, position );
+    performKOptMove_( ts, incl, p, q, tour, position );
+  }
+
+  void INLINE_ATTRIBUTE performKOptMove_( const vector< size_t >& ts,
                                           vector< size_t >& tour,
                                           vector< size_t >& position )
   {
     vector< size_t > p, q, incl;
     getPQI_( p, q, incl, ts, tour, position );
-    performKOptMove_( ts, incl, tour, position );
+    performKOptMove_( ts, incl, p, q, tour, position );
   }
 
   bool INLINE_ATTRIBUTE makesTour_( const vector< size_t >& ts,
@@ -832,7 +756,7 @@ double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >
           }
         }
         if ( maxGain > tolerance ) {
-          performMove_( bestTs, tour, position );
+          performKOptMove_( bestTs, tour, position );
           assert( isTour_( tour, position ) );
           anyChange = true;
           changed = true;
@@ -942,7 +866,7 @@ double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >
             dontLook[ bestTs[ i ] ] = false;
           }
         }
-        performMove_( bestTs, tour, position );
+        performKOptMove_( bestTs, tour, position );
         assert( isTour_( tour, position ) );
         found = true;
         changed = true;
@@ -1418,7 +1342,7 @@ double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >
         break;
       }
       tour = bestTour;
-      kSwapKick( 6, tour, dontLook );
+      kSwapKick( 4, tour, dontLook );
     }
     tour = bestTour;
     return change;
@@ -1484,7 +1408,11 @@ double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >
     {
       double start( clock() );
       nearestNeighbors30 = computeNearestNeighbors_( distances, 30 );
+      double timeNN( ( clock() - start ) / CLOCKS_PER_SEC );
+      start = clock();
       helsgaun10 = computeHelsgaunNeighbors_( distances, helsgaunDistances, 10 );
+      double timeHelsgaun( ( clock() - start ) / CLOCKS_PER_SEC );
+      start = clock();
       if ( false ) {
         vector< size_t > helsgainInitialTour = getHelsgaunInitialTour_( nearestNeighbors30, helsgaunDistances, tourGreedy );
       }
@@ -1519,9 +1447,10 @@ double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >
             }
             */
     double time( ( clock() - start ) / CLOCKS_PER_SEC );
-    cerr << "Time to compute " << nearestNeighbors.front().size() << " nearest neighbors: " << time << endl;
+    cerr << "Time to compute " << nearestNeighbors30.front().size() << " nearest neighbors: " << timeNN << endl;
+    cerr << "Time to compute " << helsgaun10.front().size() << " Helsgaun neighbors: " << timeHelsgaun << endl;
+    cerr << "Time to compute rest " << time << endl;
   }
-  tour1 = tour2 = tourGreedy;
 
   cerr << "Greedy distance: " << getLength_( tourGreedy, distances ) << endl;
   if ( distances.size() < 10 ) {
@@ -1588,9 +1517,12 @@ double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >
     if ( true ) {
       tour = tourGreedy;
       double start( clock() );
+      vector< size_t > tour1( tour );
+      vector< size_t > tour2( tour );
       vector< vector< size_t > > nn( nearestNeighbors5 );
-      improveTourKOpt_( k, true, tour, distances, nn );
-      updateNearest( tour, nn );
+      while ( improveTourKOpt_( k, true, tour, distances, nn ) ) {
+        updateNearest( tour, tour1, tour2, nn );
+      }
 
       double time( ( clock() - start ) / CLOCKS_PER_SEC );
       cerr << k << "-LK  tour distance: " << getLength_( tour, distances ) << ", time: " << time << endl;
@@ -1601,7 +1533,7 @@ double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >
     if ( true ) {
       tour = tourGreedy;
       double start( clock() );
-      improveTourIteratedLKH_( k, 50, true, tour, distances, nearestNeighbors5 );
+      improveTourIteratedLKH_( k, 100, true, tour, distances, nearestNeighbors5 );
 
       double time( ( clock() - start ) / CLOCKS_PER_SEC );
       cerr << k << "-ILK tour distance: " << getLength_( tour, distances ) << ", time: " << time << endl;

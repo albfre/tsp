@@ -72,20 +72,60 @@ void testTSPRegular( size_t numOfPoints )
   }
 }
 
-void testTSPDrill( int arg )
+void trim( string& s )
 {
-  vector< vector< double > > points = getDrill();
+  s.erase( s.find_last_not_of( " \n\r\t" ) + 1 );
+}
+
+vector< vector< double > > readTSP( string fileName )
+{
+  ifstream file( "lib/" + fileName + ".tsp" );
+  assert( file.is_open() );
+  vector< vector< double > > points;
+  points.reserve( 1000 );
+  string line;
+  while ( !file.eof() ) {
+    getline( file, line );
+    trim( line );
+    if ( line == "NODE_COORD_SECTION" ) {
+      getline( file, line );
+      trim( line );
+      while ( !file.eof() && line != "EOF" ) {
+        istringstream iss( line );
+        string token;
+        assert( iss );
+        iss >> token;
+        assert( iss );
+        iss >> token;
+        points.push_back( vector< double >( 2 ) );
+        points.back()[ 0 ] = atof( token.c_str() );
+        assert( iss );
+        iss >> token;
+        points.back()[ 1 ] = atof( token.c_str() );
+        getline( file, line );
+        trim( line );
+      }
+    }
+  }
+  assert( points.size() > 0 );
+  return points;
+}
+
+void testTSPLib( string name )
+{
+  vector< vector< double > > points = readTSP( name );
   size_t numOfPoints = points.size();
   vector< vector< double > > distances( numOfPoints, vector< double >( numOfPoints ) );
   for ( size_t i = 0; i < numOfPoints; ++i ) {
     for ( size_t j = i + 1; j < numOfPoints; ++j ) {
       distances[ i ][ j ] = computeDistance( points[ i ], points[ j ] );
+      distances[ i ][ j ] = double( long( distances[ i ][ j ] + 0.5 ) );
       distances[ j ][ i ] = distances[ i ][ j ];
     }
     distances[ i ][ i ] = 0.0;
   }
 
-  cout << "Running test on random instance with " << numOfPoints << " points." << endl;
+  cout << "Running test on " + name + " with " << numOfPoints << " points." << endl;
   double start( clock() );
   vector< size_t > path = computeTour( distances );
   cout << "CPU seconds to run test: " << setprecision( 4 ) << ( clock() - start ) / CLOCKS_PER_SEC << endl;;
@@ -188,9 +228,10 @@ int main( int argc, const char* argv[] )
   else {
     switch ( atoi( argv[ 1 ] ) ) {
       case 0: testTSPRegular( atoi( argv[ 2 ] ) ); break;
-      case 1: testTSPDrill( atoi( argv[ 2 ] ) ); break;
+      case 1: testTSPLib( "pcb1173" ); break;
       case 2: testTSPRandomClusters( atoi( argv[ 2 ] ) ); break;
       case 3: testTSPHex( atoi( argv[ 2 ] ) ); break;
+      default: testTSPLib( string( argv[ 2 ] ) );
     }
   }
 }
