@@ -1,10 +1,8 @@
 /* SYSTEM INCLUDES */
 #include <algorithm>
 #include <assert.h>
-#include <cmath>
 #include <cstdlib>
 #include <ctime>
-#include <functional>
 #include <numeric>
 #include <iostream>
 #include <iomanip>
@@ -22,11 +20,25 @@
 #endif
 
 using namespace std;
+using namespace TravelingSalespersonProblemSolver;
 
 namespace {
 const double tolerance = 1e-9;
 const bool useInfeasibleMoves = true;
 const size_t maxGainMoves = 1000;
+vector< size_t > better;
+bool inBetterTour( size_t t1, size_t t2 )
+{
+  for ( size_t i = 0; i + 1 < better.size(); ++i ) {
+    if ( ( better[ i ] == t1 && better[ i + 1 ] == t2 ) ||
+         ( better[ i ] == t2 && better[ i + 1 ] == t1 ) ) {
+      return true;
+    }
+  }
+  return better.size() > 1 &&
+         ( ( better.front() == t1 && better.back() == t2 ) ||
+           ( better.front() == t2 && better.back() == t1 ) );
+}
 
 // Updates the nearest neighbor matrix on the basis of two previous tours
 void updateNearest( const vector< size_t >& tour,
@@ -39,24 +51,17 @@ void updateNearest( const vector< size_t >& tour,
 
   set< vector< size_t > > e1;
   set< vector< size_t > > e2;
-  for ( size_t i = 0; i + 1 < tour1.size(); ++i ) {
-    vector< size_t > e( { tour1[ i ], tour1[ i + 1 ] } );
+  for ( size_t i = 0; i < tour1.size(); ++i ) {
+    vector< size_t > e( { tour1[ i ], tour1[ i + 1 == tour1.size() ? 0 : i + 1 ] } );
     sort( e.begin(), e.end() );
     e1.insert( e );
 
-    e = { tour2[ i ], tour2[ i + 1 ] };
+    e = { tour2[ i ], tour2[ i + 1 == tour2.size() ? 0 : i + 1 ] };
     sort( e.begin(), e.end() );
     e2.insert( e );
   }
-  vector< size_t > e( { tour1.front(), tour1.back() } );
-  sort( e.begin(), e.end() );
-  e1.insert( e );
 
-  e = { tour2.front(), tour2.back() };
-  sort( e.begin(), e.end() );
-  e2.insert( e );
-
-
+  /*
   for ( const auto& v : e1 ) {
     size_t i1 = v[ 0 ];
     size_t i2 = v[ 1 ];
@@ -67,6 +72,7 @@ void updateNearest( const vector< size_t >& tour,
       nearest[ i2 ].insert( nearest[ i2 ].end(), i1 );
     }
   }
+  */
 
   vector< vector< size_t > > v( tour.size() );
   vector< vector< size_t > >::iterator it = set_intersection( e1.begin(), e1.end(), e2.begin(), e2.end(), v.begin() );
@@ -76,38 +82,21 @@ void updateNearest( const vector< size_t >& tour,
     size_t i1 = v[ i ][ 0 ];
     size_t i2 = v[ i ][ 1 ];
     nearest[ i1 ].insert( nearest[ i1 ].begin(), i2 );
-    if ( find( nearest[ i1 ].begin(), nearest[ i1 ].end(), i2 ) != nearest[ i1 ].end() ) {
-      size_t ii = 1;
-      while ( ii < nearest[ i1 ].size() && nearest[ i1 ][ ii ] != i2 ) {
-        ++ii;
-      }
-      while ( ii + 1 < nearest[ i1 ].size() ) {
-        nearest[ i1 ][ ii ] = nearest[ i1 ][ ii + 1 ];
-        ++ii;
-      }
-      nearest[ i1 ].resize( nearest[ i1 ].size() - 1 );
-    }
+    size_t size1 = remove_if( nearest[ i1 ].begin() + 1, nearest[ i1 ].end(), [&] ( size_t index ) { return index == i2; } ) - nearest[ i1 ].begin();
+    nearest[ i1 ].resize( size1 );
+
     nearest[ i2 ].insert( nearest[ i2 ].begin(), i1 );
-    if ( find( nearest[ i2 ].begin(), nearest[ i2 ].end(), i1 ) != nearest[ i2 ].end() ) {
-      size_t ii = 1;
-      while ( ii < nearest[ i2 ].size() && nearest[ i2 ][ ii ] != i1 ) {
-        ++ii;
-      }
-      while ( ii + 1 < nearest[ i2 ].size() ) {
-        nearest[ i2 ][ ii ] = nearest[ i2 ][ ii + 1 ];
-        ++ii;
-      }
-      nearest[ i2 ].resize( nearest[ i2 ].size() - 1 );
-    }
+    size_t size2 = remove_if( nearest[ i2 ].begin() + 1, nearest[ i2 ].end(), [&] ( size_t index ) { return index == i1; } ) - nearest[ i2 ].begin();
+    nearest[ i2 ].resize( size2 );
   }
 }
 
 double INLINE_ATTRIBUTE getLength_( const vector< size_t >& tour,
-                                    const vector< vector< double > >& distances )
+                                    const VDistances& distances )
 {
-  double distance = distances[ tour.back() ][ tour.front() ];
+  double distance = distances( tour.back(), tour.front() );
   for ( size_t i = 0; i + 1 < tour.size(); ++i ) {
-    distance += distances[ tour[ i ] ][ tour[ i + 1 ] ];
+    distance += distances( tour[ i ], tour[ i + 1 ] );
   }
   return distance;
 }
@@ -136,7 +125,7 @@ bool INLINE_ATTRIBUTE isTour_( const vector< size_t >& tour,
 }
 
 bool INLINE_ATTRIBUTE isTour_( const vector< size_t >& tour,
-                               const vector< vector< double > >& distances )
+                               const VDistances& distances )
 {
   assert( tour.size() == distances.size() );
   vector< size_t > position( tour.size() );
@@ -146,7 +135,32 @@ bool INLINE_ATTRIBUTE isTour_( const vector< size_t >& tour,
   return isTour_( tour, position );
 }
 
-vector< size_t > INLINE_ATTRIBUTE getRandomTour_( const vector< vector< double > >& distances )
+size_t previous_( size_t node, const vector< size_t >& tour, const vector< size_t >& position )
+{
+  return position[ node ] > 0 ? tour[ position[ node ] - 1 ] : tour.back();
+}
+
+size_t next_( size_t node, const vector< size_t >& tour, const vector< size_t >& position )
+{
+  return position[ node ] + 1 < tour.size() ? tour[ position[ node ] + 1 ] : tour.front();
+}
+
+bool between_( size_t a, size_t b, size_t c, const vector< size_t >& position )
+{
+  return position[ a ] <= position[ c ] ? position[ a ] >= position[ b ] || position[ b ] >= position[ c ]
+                                        : position[ b ] <= position[ a ] && position[ b ] >= position[ c ];
+}
+
+double getDistance_( const VDistances& distances,
+                     const vector< double >& lagrangeMultipliers,
+                     size_t i,
+                     size_t j )
+{
+  return distances( i, j ) + lagrangeMultipliers[ i ] + lagrangeMultipliers[ j ];
+}
+
+
+vector< size_t > INLINE_ATTRIBUTE getRandomTour_( const VDistances& distances )
 {
   vector< size_t > tour( distances.size() );
   for ( size_t i = 0; i < distances.size(); ++i ) {
@@ -161,7 +175,7 @@ vector< size_t > INLINE_ATTRIBUTE getRandomTour_( const vector< vector< double >
   return tour;
 }
 
-vector< size_t > INLINE_ATTRIBUTE getNearestNeighborTour_( const vector< vector< double > >& distances )
+vector< size_t > INLINE_ATTRIBUTE getNearestNeighborTour_( const VDistances& distances )
 {
   vector< size_t > tour;
   tour.reserve( distances.size() );
@@ -175,7 +189,7 @@ vector< size_t > INLINE_ATTRIBUTE getNearestNeighborTour_( const vector< vector<
     double minUnusedDistance = numeric_limits< double >::max();
     for ( size_t i = 0; i < distances.size(); ++i ) {
       if ( usedNodes.find( i ) == usedNodes.end() ) {
-        double distance = distances[ currentNode ][ i ];
+        double distance = distances( currentNode, i );
         if ( distance < minUnusedDistance ) {
           minUnusedIndex = i;
           minUnusedDistance = distance;
@@ -190,10 +204,12 @@ vector< size_t > INLINE_ATTRIBUTE getNearestNeighborTour_( const vector< vector<
   return tour;
 }
 
-vector< size_t > INLINE_ATTRIBUTE getGreedyTour_( const vector< vector< double > >& distances )
+vector< size_t > INLINE_ATTRIBUTE getGreedyTour_( const VDistances& distances,
+                                                  const vector< double >& lagrangeMultipliers )
 {
   // The greedy heuristic of matroid theory adds the shortest edge that neither
   // makes the degree of a vertex greater than 2 nor creates a cycle shorter than N.
+  assert( distances.size() == lagrangeMultipliers.size() );
   vector< size_t > degree( distances.size() );
 
   vector< size_t > fragmentIndices( distances.size() );
@@ -205,11 +221,10 @@ vector< size_t > INLINE_ATTRIBUTE getGreedyTour_( const vector< vector< double >
   vector< pair< double, pair< size_t, size_t > > > edges;
   edges.reserve( distances.size() * ( distances.size() - 1 ) / 2 );
   for ( size_t i = 0; i < distances.size(); ++i ) {
-    for ( size_t j = i + 1; j < distances[ i ].size(); ++j ) {
-      edges.push_back( make_pair( distances[ i ][ j ], make_pair( i, j ) ) );
+    for ( size_t j = i + 1; j < distances.size(); ++j ) {
+      edges.push_back( make_pair( getDistance_( distances, lagrangeMultipliers, i, j ), make_pair( i, j ) ) );
     }
   }
-  vector< pair< size_t, size_t > > addedEdges;
   sort( edges.rbegin(), edges.rend() ); // sort from rbegin to rend => smallest element last
   while ( !edges.empty() ) {
     pair< size_t, size_t > edgeNodes = edges.back().second;
@@ -255,10 +270,18 @@ vector< size_t > INLINE_ATTRIBUTE getGreedyTour_( const vector< vector< double >
   return tour;
 }
 
+vector< size_t > INLINE_ATTRIBUTE getGreedyTour_( const VDistances& distances )
+{
+  vector< double > lagrangeMultipliers( distances.size(), 0.0 );
+  return getGreedyTour_( distances, lagrangeMultipliers );
+}
+
 vector< size_t > INLINE_ATTRIBUTE getHelsgaunInitialTour_( const vector< vector< size_t > >& nearestNeighbors,
-                                                           const vector< vector< double > >& distances,
+                                                           const vector< vector< size_t > >& helsgaunNeighbors,
+                                                           const vector< vector< double > >& helsgaunDistances,
                                                            const vector< size_t >& bestTour )
 {
+  assert( helsgaunNeighbors.size() == helsgaunDistances.size() );
   assert( bestTour.size() == nearestNeighbors.size() );
   vector< size_t > tour( 1, rand() % nearestNeighbors.size() );
   size_t current = tour.front();
@@ -274,10 +297,10 @@ vector< size_t > INLINE_ATTRIBUTE getHelsgaunInitialTour_( const vector< vector<
     current = tour.back();
     bool found = false;
     size_t bestNext = (size_t)-1;
-    for ( size_t i = 0; i < nearestNeighbors[ current ].size(); ++i ) {
-      size_t next = nearestNeighbors[ current ][ i ];
+    for ( size_t i = 0; i < helsgaunNeighbors[ current ].size(); ++i ) {
+      size_t next = helsgaunNeighbors[ current ][ i ];
       if ( !added[ next ] &&
-           distances[ current ][ next ] < tolerance &&
+           helsgaunDistances[ current ][ i ] < tolerance &&
            ( bestTour[ ( bestPosition[ current ] + 1 ) % bestTour.size() ] == next ||
              bestTour[ ( bestPosition[ current ] + bestTour.size() - 1 ) % bestTour.size() ] == next ) ) {
         bestNext = next;
@@ -286,6 +309,19 @@ vector< size_t > INLINE_ATTRIBUTE getHelsgaunInitialTour_( const vector< vector<
         break;
       }
     }
+/*    if ( !found ) {
+      for ( size_t i = 0; i < helsgaunNeighbors[ current ].size(); ++i ) {
+        size_t next = helsgaunNeighbors[ current ][ i ];
+        if ( !added[ next ] &&
+             helsgaunDistances[ current ][ i ] < tolerance ) {
+          bestNext = next;
+          added[ next ] = true;
+          found = true;
+          break;
+        }
+      }
+    }
+    */
     if ( !found ) {
       for ( size_t i = 0; i < nearestNeighbors[ current ].size(); ++i ) {
         size_t next = nearestNeighbors[ current ][ i ];
@@ -319,7 +355,7 @@ vector< size_t > INLINE_ATTRIBUTE getHelsgaunInitialTour_( const vector< vector<
 }
 
 // Computes the optimal tour using brute force
-vector< size_t > getBruteForceTour_( const vector< vector< double > >& distances )
+vector< size_t > getBruteForceTour_( const VDistances& distances )
 {
   assert( !distances.empty() );
   assert( distances.size() < 10 );
@@ -342,7 +378,7 @@ vector< size_t > getBruteForceTour_( const vector< vector< double > >& distances
   return bestTour;
 }
 
-vector< vector< size_t > > INLINE_ATTRIBUTE computeNearestNeighbors_( const vector< vector< double > >& distances,
+vector< vector< size_t > > INLINE_ATTRIBUTE computeNearestNeighbors_( const VDistances& distances,
                                                                       size_t numberOfNeighbors )
 {
   numberOfNeighbors = min( numberOfNeighbors, distances.size() - 1 );
@@ -352,19 +388,20 @@ vector< vector< size_t > > INLINE_ATTRIBUTE computeNearestNeighbors_( const vect
   for ( size_t i = 0; i < distances.size(); ++i ) {
     tmpNeighbors.clear();
     double worstNearNeighbor = numeric_limits< double >::max();
-    for ( size_t j = 0; j < distances[ i ].size(); ++j ) {
+    for ( size_t j = 0; j < distances.size(); ++j ) {
       if ( j != i ) {
-        if ( tmpNeighbors.size() < numberOfNeighbors || distances[ i ][ j ] < worstNearNeighbor ) {
+        if ( tmpNeighbors.size() < numberOfNeighbors || distances( i, j ) < worstNearNeighbor ) {
           if ( tmpNeighbors.size() >= numberOfNeighbors ) {
             set< pair< double, size_t > >::iterator itLast = tmpNeighbors.end();
             --itLast;
             tmpNeighbors.erase( itLast );
-            worstNearNeighbor = tmpNeighbors.rbegin()->first;
           }
-          tmpNeighbors.insert( make_pair( distances[ i ][ j ], j ) );
+          tmpNeighbors.insert( make_pair( distances( i, j ), j ) );
+          worstNearNeighbor = tmpNeighbors.rbegin()->first;
         }
       }
     }
+    assert( tmpNeighbors.size() == numberOfNeighbors );
     set< pair< double, size_t > >::const_iterator it = tmpNeighbors.begin();
     for ( size_t j = 0; j < numberOfNeighbors; ++j, ++it ) {
       nearestNeighbors[ i ][ j ] = it->second;
@@ -373,24 +410,17 @@ vector< vector< size_t > > INLINE_ATTRIBUTE computeNearestNeighbors_( const vect
   return nearestNeighbors;
 }
 
-double getDistance_( const vector< vector< double > >& distances,
-                     const vector< double >& lagrangeMultipliers,
-                     size_t i,
-                     size_t j )
-{
-  return distances[ i ][ j ] + lagrangeMultipliers[ i ] + lagrangeMultipliers[ j ];
-}
-
 struct Vertex {
-  Vertex( size_t idx ) : nodeIndex( idx ) {}
+  Vertex( size_t idx ) : nodeIndex( idx ), cost( numeric_limits< double >::max() ) {}
   size_t nodeIndex;
   size_t parentIndexInVertexList;
+  double cost;
 };
 
 double INLINE_ATTRIBUTE compute1Tree_( vector< Vertex >& vertices,
                                        vector< pair< size_t, size_t > >& edges,
                                        vector< size_t >& vertexDegrees,
-                                       const vector< vector< double > >& distances,
+                                       const VDistances& distances,
                                        const vector< double >& lagrangeMultipliers )
 {
   vertices.clear();
@@ -401,67 +431,61 @@ double INLINE_ATTRIBUTE compute1Tree_( vector< Vertex >& vertices,
 
   // 1. Compute length of the minimum spanning tree excluding one vertex, using Prim's algorithm.
 
-  // Select the vertex with minimum maximal distances to a neighbor in
+  // Select the vertex with minimum maximal distance to a neighbor in
   // order to allow for problems with artificial nodes (such as those used
   // to construct Hamiltonian tours) with toleranceilon distance to all neighbors.
   size_t minimaxVertex = 0;
-  double minimaxValue = *max_element( distances[ 0 ].begin(), distances[ 0 ].end() );
-  for ( size_t i = 1; i < distances.size(); ++i ) {
-    double value = *max_element( distances[ i ].begin(), distances[ i ].end() );
-    if ( value < minimaxValue ) {
+  double minimaxValue = numeric_limits< double >::max();
+  for ( size_t i = 0; i + 1 < distances.size(); ++i ) {
+    double value = 0.0;
+    for ( size_t j = i + 1; j < distances.size(); ++j ) {
+      value = max( value, distances( i, j ) );
+    }
+    if ( value < minimaxValue  ) {
       minimaxValue = value;
       minimaxVertex = i;
     }
   }
 
   vertices.push_back( Vertex( minimaxVertex ) );
+  size_t rootVertex = ( minimaxVertex + 1 ) % distances.size();
+  vertices.push_back( Vertex( rootVertex ) );
 
-  vector< size_t > unusedVertices;
-  unusedVertices.reserve( distances.size() - 1 );
+  vector< Vertex > unusedVertices;
+  unusedVertices.reserve( distances.size() - 2 );
   for ( size_t i = 0; i < distances.size(); ++i ) {
-    if ( i != minimaxVertex ) {
-      unusedVertices.push_back( i );
+    if ( i != minimaxVertex && i != rootVertex ) {
+      unusedVertices.push_back( Vertex( i ) );
+      unusedVertices.back().parentIndexInVertexList = 1;
+      unusedVertices.back().cost = getDistance_( distances, lagrangeMultipliers, i, vertices[ 1 ].nodeIndex );
     }
   }
 
-  // Popping one element means that it is added to the tree; add the root to the tree.
-  size_t rootVertex = unusedVertices.back();
-  unusedVertices.pop_back();
-  vertices.push_back( Vertex( rootVertex ) );
-
-  // For each unused vertex i, closestTreeNode[ i ] points to the vertex in the tree which is closest to i.
-  vector< size_t > closestTreeNode( distances.size(), 1 ); // 1 is index of rootVertex in vertex list
-
   double treeLength = 0.0;
   while ( !unusedVertices.empty() ) {
-    size_t indexOfClosestTreeNode = 0;
-    vector< size_t >::iterator closestUnusedVertexIt = unusedVertices.begin();
+    vector< Vertex >::iterator closestUnusedVertexIt = unusedVertices.begin();
     double minDistance = numeric_limits< double >::max();
-    for ( vector< size_t >::iterator it = unusedVertices.begin(); it != unusedVertices.end(); ++it ) {
-      size_t indexOfTreeNode = vertices[ closestTreeNode[ *it ] ].nodeIndex;
-      double distance = getDistance_( distances, lagrangeMultipliers, indexOfTreeNode, *it );
-      if ( distance < minDistance ) {
-        minDistance = distance;
-        indexOfClosestTreeNode = indexOfTreeNode;
+    for ( vector< Vertex >::iterator it = unusedVertices.begin(); it != unusedVertices.end(); ++it ) {
+      if ( it->cost < minDistance ) {
+        minDistance = it->cost;
         closestUnusedVertexIt = it;
       }
     }
     treeLength += minDistance;
-    size_t indexOfNewTreeNode = *closestUnusedVertexIt;
-    ++vertexDegrees[ indexOfClosestTreeNode ];
+    size_t indexOfNewTreeNode = closestUnusedVertexIt->nodeIndex;
+    size_t indexOfClosestTreeNode = vertices[ closestUnusedVertexIt->parentIndexInVertexList ].nodeIndex;
     ++vertexDegrees[ indexOfNewTreeNode ];
-    vertices.push_back( Vertex( indexOfNewTreeNode ) );
-    vertices.back().parentIndexInVertexList = closestTreeNode[ *closestUnusedVertexIt ];
+    ++vertexDegrees[ indexOfClosestTreeNode ];
+    vertices.push_back( *closestUnusedVertexIt );
     edges.push_back( make_pair( indexOfClosestTreeNode, indexOfNewTreeNode ) );
     *closestUnusedVertexIt = unusedVertices.back();
     unusedVertices.pop_back();
 
-    for ( vector< size_t >::iterator it = unusedVertices.begin(); it != unusedVertices.end(); ++it ) {
-      size_t indexOfTreeNode = vertices[ closestTreeNode[ *it ] ].nodeIndex;
-      double oldDistance = getDistance_( distances, lagrangeMultipliers, indexOfTreeNode, *it );
-      double newDistance = getDistance_( distances, lagrangeMultipliers, indexOfNewTreeNode, *it );
-      if ( newDistance < oldDistance ) {
-        closestTreeNode[ *it ] = vertices.size() - 1;
+    for ( vector< Vertex >::iterator it = unusedVertices.begin(); it != unusedVertices.end(); ++it ) {
+      double newDistance = getDistance_( distances, lagrangeMultipliers, indexOfNewTreeNode, it->nodeIndex );
+      if ( newDistance < it->cost ) {
+        it->cost = newDistance;
+        it->parentIndexInVertexList = vertices.size() - 1;
       }
     }
   }
@@ -471,7 +495,7 @@ double INLINE_ATTRIBUTE compute1Tree_( vector< Vertex >& vertices,
   double secondMinElement = numeric_limits< double >::max();
   size_t minElementIndex = 0;
   size_t secondMinElementIndex = 0;
-  for ( size_t i = 0; i < distances[ minimaxVertex ].size(); ++i ) {
+  for ( size_t i = 0; i < distances.size(); ++i ) {
     if ( i == minimaxVertex ) {
       continue;
     }
@@ -497,111 +521,133 @@ double INLINE_ATTRIBUTE compute1Tree_( vector< Vertex >& vertices,
   return treeLength - 2.0 * accumulate( lagrangeMultipliers.begin(), lagrangeMultipliers.end(), 0.0 );
 }
 
-double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >& distances, vector< double >& lagrangeMultipliers )
+double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const VDistances& distances, vector< double >& lagrangeMultipliers )
 {
   double maxLength = numeric_limits< double >::lowest();
   lagrangeMultipliers.assign( distances.size(), 0.0 );
   vector< double > localLagrangeMultipliers( lagrangeMultipliers );
   vector< Vertex > vertices;
-  vector< pair< size_t, size_t > > edges;
   vector< size_t > vertexDegrees;
+  vector< pair< size_t, size_t > > edges;
+  size_t maxIter = 50;
+  if ( distances.size() > 50000 ) {
+    maxIter = 1;
+  }
   double lambda = 0.1;
-    for ( size_t i = 0; i < 50; ++i ) {
-      vector< size_t > vertexDegrees;
-      double treeLength = compute1Tree_( vertices, edges, vertexDegrees, distances, localLagrangeMultipliers );
-      if ( treeLength > maxLength ) {
-        maxLength = treeLength;
-        lagrangeMultipliers = localLagrangeMultipliers;
-      }
-
-      double denominator = 0.0;
-      for ( size_t j = 0; j < localLagrangeMultipliers.size(); ++j ) {
-        double d = double( vertexDegrees[ j ] ) - 2.0;
-        denominator += d * d;
-      }
-      if ( denominator == 0.0 ) {
-        return maxLength;
-      }
-      double t = 2.0 * lambda * treeLength / denominator;
-
-      for ( size_t j = 0; j < localLagrangeMultipliers.size(); ++j ) {
-        localLagrangeMultipliers[ j ] += t * ( int( vertexDegrees[ j ] ) - 2 );
-      }
-      lambda = 1.0 / ( 20.0 + 10 * i );
+  for ( size_t i = 0; i < maxIter; ++i ) {
+    vector< size_t > vertexDegrees;
+    double treeLength = compute1Tree_( vertices, edges, vertexDegrees, distances, localLagrangeMultipliers );
+    if ( treeLength > maxLength ) {
+      maxLength = treeLength;
+      lagrangeMultipliers = localLagrangeMultipliers;
     }
+
+    double denominator = 0.0;
+    for ( size_t j = 0; j < localLagrangeMultipliers.size(); ++j ) {
+      double d = double( vertexDegrees[ j ] ) - 2.0;
+      denominator += d * d;
+    }
+    if ( denominator == 0.0 ) {
+      return maxLength;
+    }
+    double t = 2.0 * lambda * treeLength / denominator;
+
+    for ( size_t j = 0; j < localLagrangeMultipliers.size(); ++j ) {
+      localLagrangeMultipliers[ j ] += t * ( int( vertexDegrees[ j ] ) - 2 );
+    }
+    lambda = 1.0 / ( 20.0 + 10 * i );
+  }
 
     return maxLength;
   }
 
-  double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >& distances )
+  double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const VDistances& distances )
   {
     vector< double > lagrangeMultipliers( distances.size() );
     return getHeldKarpLowerBound_( distances, lagrangeMultipliers );
   }
 
-  vector< vector< size_t > > INLINE_ATTRIBUTE computeHelsgaunNeighbors_( const vector< vector< double > >& distances,
+  vector< vector< size_t > > INLINE_ATTRIBUTE computeHelsgaunNeighbors_( const VDistances& distances,
                                                                          vector< vector< double > >& alphaDistances,
                                                                          size_t numberOfNeighbors )
   {
+    numberOfNeighbors = min( numberOfNeighbors, distances.size() - 1 );
+    assert( numberOfNeighbors > 0 );
+
     vector< Vertex > vertices;
-    vector< pair< size_t, size_t > > edges;
     vector< size_t > vertexDegrees;
+    vector< pair< size_t, size_t > > edges;
     vector< double > lagrangeMultipliers( distances.size(), 0.0 );
     getHeldKarpLowerBound_( distances, lagrangeMultipliers );
+
     compute1Tree_( vertices,
                    edges,
                    vertexDegrees,
                    distances,
                    lagrangeMultipliers );
 
-    // insert (i,j) in T, this creates a cycle containing (i,j) in the spanning tree part of T. Then T(i,j) is obtained by removing the longest of the other edges in this cycle.
-    vector< vector< double > > beta( distances.size(), vector< double >( distances.size() ) );
-    for ( size_t i = 1; i < vertices.size(); ++i ) {
-      size_t iInd = vertices[ i ].nodeIndex;
-      beta[ iInd ][ iInd ] = numeric_limits< double >::lowest();
-      for ( size_t j = i + 1; j < vertices.size(); ++j ) {
-        size_t jInd = vertices[ j ].nodeIndex;
-        size_t jParentInd = vertices[ vertices[ j ].parentIndexInVertexList ].nodeIndex;
-        beta[ iInd ][ jInd ] = beta[ jInd ][ iInd ] = max( beta[ iInd ][ jParentInd ], getDistance_( distances, lagrangeMultipliers, jInd, jParentInd ) );
-      }
-    }
-    alphaDistances.assign( distances.size(), vector< double >( distances.size() ) );
-    for ( size_t i = 0; i < beta.size(); ++i ) {
-      for ( size_t j = 0; j < beta[ i ].size(); ++j ) {
-        alphaDistances[ i ][ j ] = getDistance_( distances, lagrangeMultipliers, i, j ) - beta[ i ][ j ];
-      }
-    }
-
-    // if i or j has minimaxNode as end node, then T(i,j) is obtained from T by replacing the longest of the two edges of T incident to minimaxNode with (i,j)
-    double maxEdgeWeight = max( getDistance_( distances, lagrangeMultipliers, edges[ edges.size() - 2 ].first, edges[ edges.size() - 2 ].second ),
-                                getDistance_( distances, lagrangeMultipliers, edges[ edges.size() - 1 ].first, edges[ edges.size() - 1 ].second ) );
+    vector< vector< size_t > > nearestNeighbors( distances.size(), vector< size_t >( numberOfNeighbors ) );
+    alphaDistances.resize( distances.size(), vector< double >( numberOfNeighbors ) );
+    set< pair< double, size_t > > tmpNeighbors;
+    vector< double > a( distances.size(), 0.0 );
+    vector< double > b( distances.size() );
+    vector< size_t > mark( distances.size(), 0 );
+    size_t frontInd = vertices.front().nodeIndex;
+    const double maxEdgeWeight = max( getDistance_( distances, lagrangeMultipliers, edges.end()[ -2 ].first, edges.end()[ -2 ].second ),
+                                      getDistance_( distances, lagrangeMultipliers, edges.end()[ -1 ].first, edges.end()[ -1 ].second ) );
     for ( size_t i = 0; i < distances.size(); ++i ) {
-      alphaDistances[ vertices.front().nodeIndex ][ i ] = alphaDistances[ i ][ vertices.front().nodeIndex ] = getDistance_( distances, lagrangeMultipliers, i, vertices.front().nodeIndex ) - maxEdgeWeight;
+      const size_t iInd = vertices[ i ].nodeIndex;
+      if ( i == 0 ) {
+        for ( size_t j = 1; j < distances.size(); ++j ) {
+          size_t jInd = vertices[ j ].nodeIndex;
+          a[ jInd ] = getDistance_( distances, lagrangeMultipliers, jInd, iInd ) - maxEdgeWeight;
+        }
+      }
+      else {
+        b[ i ] = numeric_limits< double >::lowest();
+        size_t j = 0;
+        for ( size_t k = i; k != 1; k = j ) {
+          j = vertices[ k ].parentIndexInVertexList;
+          b[ j ] = max( b[ k ], getDistance_( distances, lagrangeMultipliers, vertices[ j ].nodeIndex, vertices[ k ].nodeIndex ) );
+          mark[ j ] = i;
+        }
+        fill( a.begin(), a.end(), 0.0 );
+        for ( j = 1; j < vertices.size(); ++j ) {
+          if ( j != i ) {
+            size_t jInd = vertices[ j ].nodeIndex;
+            if ( mark[ j ] != i ) {
+              size_t jParent = vertices[ j ].parentIndexInVertexList;
+              b[ j ] = max( b[ jParent ], getDistance_( distances, lagrangeMultipliers, jInd, vertices[ jParent ].nodeIndex ) );
+            }
+            a[ jInd ] = getDistance_( distances, lagrangeMultipliers, iInd, jInd ) - b[ j ];
+          }
+        }
+        a[ frontInd ] = getDistance_( distances, lagrangeMultipliers, iInd, frontInd ) - maxEdgeWeight;
+      }
+      tmpNeighbors.clear();
+      double worstNearNeighbor = numeric_limits< double >::max();
+      for ( size_t j = 0; j < distances.size(); ++j ) {
+        if ( j != i ) {
+          size_t jInd = vertices[ j ].nodeIndex;
+          if ( tmpNeighbors.size() < numberOfNeighbors || a[ jInd ] < worstNearNeighbor ) {
+            if ( tmpNeighbors.size() >= numberOfNeighbors ) {
+              set< pair< double, size_t > >::iterator itLast = tmpNeighbors.end();
+              --itLast;
+              tmpNeighbors.erase( itLast );
+            }
+            tmpNeighbors.insert( make_pair( a[ jInd ], jInd ) );
+            worstNearNeighbor = tmpNeighbors.rbegin()->first;
+          }
+        }
+      }
+      assert( tmpNeighbors.size() == numberOfNeighbors );
+      set< pair< double, size_t > >::const_iterator it = tmpNeighbors.begin();
+      for ( size_t j = 0; j < numberOfNeighbors; ++j, ++it ) {
+        alphaDistances[ iInd ][ j ] = it->first;
+        nearestNeighbors[ iInd ][ j ] = it->second;
+      }
     }
-    alphaDistances[ vertices.front().nodeIndex ][ vertices.front().nodeIndex ] = 0.0;
-
-    // if (i,j) belongs to T, then T(i,j) is equal to T
-    for ( size_t i = 0; i < edges.size(); ++i ) {
-      alphaDistances[ edges[ i ].first ][ edges[ i ].second ] = alphaDistances[ edges[ i ].second ][ edges[ i ].first ] = 0.0;
-    }
-
-    return computeNearestNeighbors_( alphaDistances, numberOfNeighbors );
-  }
-
-  size_t previous_( size_t node, const vector< size_t >& tour, const vector< size_t >& position )
-  {
-    return position[ node ] > 0 ? tour[ position[ node ] - 1 ] : tour.back();
-  }
-
-  size_t next_( size_t node, const vector< size_t >& tour, const vector< size_t >& position )
-  {
-    return position[ node ] + 1 < tour.size() ? tour[ position[ node ] + 1 ] : tour.front();
-  }
-
-  bool between_( size_t a, size_t b, size_t c, const vector< size_t >& position )
-  {
-    return position[ a ] <= position[ c ] ? position[ a ] >= position[ b ] || position[ b ] >= position[ c ]
-                                          : position[ b ] <= position[ a ] && position[ b ] >= position[ c ];
+    return nearestNeighbors;
   }
 
   void INLINE_ATTRIBUTE getPQI_( vector< size_t >& p,
@@ -721,8 +767,9 @@ double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >
        */
   }
 
-  bool INLINE_ATTRIBUTE improveTour2Opt_( vector< size_t >& tour,
-                                          const vector< vector< double > >& distances,
+  bool INLINE_ATTRIBUTE twoOptInnerLoop_( vector< size_t >& tour,
+                                          vector< bool >& dontLook,
+                                          const VDistances& distances,
                                           const vector< vector< size_t > >& nearestNeighbors )
   {
     vector< size_t > position( tour.size() );
@@ -730,45 +777,65 @@ double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >
       position[ tour[ i ] ] = i;
     }
 
-    bool anyChange = false;
+    bool changed = false;
     vector< size_t > bestTs;
-    bool changed = true;
-    while ( changed ) {
-      changed = false;
-      for ( size_t t1 = 0; t1 < tour.size(); ++t1 ) {
-        double maxGain = 0.0;
-        for ( size_t t2choice = 0; t2choice < 2; ++t2choice  ) {
-          size_t t2 = t2choice == 0 ? previous_( t1, tour, position ) : next_( t1, tour, position );
-          for ( size_t t3index = 0; t3index < nearestNeighbors[ t2 ].size(); ++t3index ) {
-            size_t t3 = nearestNeighbors[ t2 ][ t3index ];
-            if ( t3 == previous_( t2, tour, position ) || t3 == next_( t2, tour, position ) ) {
-              continue;
-            }
-            if ( distances[ t2 ][ t3 ] >= distances[ t1 ][ t2 ] ) {
-              continue;
-            }
-            size_t t4 = t2choice == 0 ? next_( t3, tour, position ) : previous_( t3, tour, position );
-            double gain = distances[ t1 ][ t2 ] + distances[ t3 ][ t4 ] - distances[ t1 ][ t4 ] - distances[ t2 ][ t3 ];
-            if ( gain > maxGain ) {
-              maxGain = gain;
-              bestTs = { t1, t2, t3, t4 };
-            }
+    for ( size_t t1 = 0; t1 < tour.size(); ++t1 ) {
+      if ( !dontLook.empty() && dontLook[ t1 ] ) {
+        continue;
+      }
+      bool found = false;
+      double maxGain = 0.0;
+      for ( size_t t2choice = 0; t2choice < 2; ++t2choice  ) {
+        size_t t2 = t2choice == 0 ? previous_( t1, tour, position ) : next_( t1, tour, position );
+        for ( size_t t3index = 0; t3index < nearestNeighbors[ t2 ].size(); ++t3index ) {
+          size_t t3 = nearestNeighbors[ t2 ][ t3index ];
+          if ( t3 == previous_( t2, tour, position ) || t3 == next_( t2, tour, position ) ) {
+            continue;
+          }
+          if ( distances( t2, t3 ) >= distances( t1, t2 ) ) {
+            continue;
+          }
+          size_t t4 = t2choice == 0 ? next_( t3, tour, position ) : previous_( t3, tour, position );
+          double gain = distances( t1, t2 ) + distances( t3, t4 ) - distances( t1, t4 ) - distances( t2, t3 );
+          if ( gain > maxGain ) {
+            maxGain = gain;
+            bestTs = { t1, t2, t3, t4 };
           }
         }
-        if ( maxGain > tolerance ) {
-          performKOptMove_( bestTs, tour, position );
-          assert( isTour_( tour, position ) );
-          anyChange = true;
-          changed = true;
+      }
+      if ( maxGain > tolerance ) {
+        if ( !dontLook.empty() ) {
+          for ( size_t i = 0; i < bestTs.size(); ++i ) {
+            dontLook[ bestTs[ i ] ] = false;
+          }
         }
+        performKOptMove_( bestTs, tour, position );
+        assert( isTour_( tour, position ) );
+        changed = true;
+        found = true;
+      }
+      if ( !dontLook.empty() && !found ) {
+        dontLook[ t1 ] = true;
       }
     }
-    return anyChange;
+    return changed;
+  }
+
+  bool INLINE_ATTRIBUTE improveTour2Opt_( vector< size_t >& tour,
+                                          const VDistances& distances,
+                                          const vector< vector< size_t > >& nearestNeighbors )
+  {
+    bool change = false;
+    vector< bool > dontLook;
+    while ( twoOptInnerLoop_( tour, dontLook, distances, nearestNeighbors ) ) {
+      change = true;
+    }
+    return change;
   }
 
   bool INLINE_ATTRIBUTE threeOptInnerLoop_( vector< size_t >& tour,
                                             vector< bool >& dontLook,
-                                            const vector< vector< double > >& distances,
+                                            const VDistances& distances,
                                             const vector< vector< size_t > >& nearestNeighbors )
   {
     bool changed = false;
@@ -790,7 +857,7 @@ double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >
           if ( t3 == previous_( t2, tour, position ) || t3 == next_( t2, tour, position ) ) {
             continue;
           }
-          double g1 = distances[ t1 ][ t2 ] - distances[ t2 ][ t3 ];
+          double g1 = distances( t1, t2 ) - distances( t2, t3 );
           if ( g1 <= tolerance ) {
             continue;
           }
@@ -801,7 +868,7 @@ double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >
           }
           {
             // Test for improving 2-opt move
-            double gain = g1 + distances[ t3 ][ t4 ] - distances[ t4 ][ t1 ];
+            double gain = g1 + distances( t3, t4 ) - distances( t4, t1 );
             if ( gain > G ) {
               G = gain;
               bestTs = { t1, t2, t3, t4 };
@@ -812,7 +879,7 @@ double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >
             if ( t5 == previous_( t4, tour, position ) || t5 == next_( t4, tour, position ) ) {
               continue;
             }
-            double g2 = distances[ t3 ][ t4 ] - distances[ t4 ][ t5 ];
+            double g2 = distances( t3, t4 ) - distances( t4, t5 );
             if ( g1 + g2 <= tolerance ) {
               continue;
             }
@@ -822,7 +889,7 @@ double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >
             if ( t6 == t1 ) {
               continue;
             }
-            double g3 = distances[ t5 ][ t6 ] - distances[ t6 ][ t1 ];
+            double g3 = distances( t5, t6 ) - distances( t6, t1 );
             double gain = g1 + g2 + g3;
             if ( gain > G ) {
               G = gain;
@@ -841,7 +908,7 @@ double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >
                 ( t2choice == 1 && !between_( t2, t3, t5, position ) ) ) {
               continue;
             }
-            double g2 = distances[ t3 ][ t4 ] - distances[ t4 ][ t5 ];
+            double g2 = distances( t3, t4 ) - distances( t4, t5 );
             if ( g1 + g2 <= tolerance ) {
               ;
             }
@@ -851,7 +918,7 @@ double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >
             if ( t6 == t3 || t6 == t2 || t6 == t1 ) {
               continue;
             }
-            double g3 = distances[ t5 ][ t6 ] - distances[ t6 ][ t1 ];
+            double g3 = distances( t5, t6 ) - distances( t6, t1 );
             double gain = g1 + g2 + g3;
             if ( gain > G ) {
               G = gain;
@@ -879,7 +946,7 @@ double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >
   }
 
   bool INLINE_ATTRIBUTE improveTour3Opt_( vector< size_t >& tour,
-                                          const vector< vector< double > >& distances,
+                                          const VDistances& distances,
                                           const vector< vector< size_t > >& nearestNeighbors )
   {
     bool change = false;
@@ -893,7 +960,7 @@ double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >
   bool INLINE_ATTRIBUTE improveTour23InnerLoop_( vector< size_t >& tour,
                                                  vector< bool >& dontLook,
                                                  vector< bool >& otherDontLook,
-                                                 const vector< vector< double > >& distances,
+                                                 const VDistances& distances,
                                                  const vector< vector< size_t > >& nearestNeighbors )
   {
     // Performs infeasible 2-opt moves followed by a 2- or 3-opt move.
@@ -920,7 +987,7 @@ double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >
           if ( t3 == t1 || t4 == t1 ) {
             continue;
           }
-          double gainFirstBridge = distances[ t1 ][ t2 ] + distances[ t3 ][ t4 ] - distances[ t2 ][ t3 ] - distances[ t1 ][ t4 ];
+          double gainFirstBridge = distances( t1, t2 ) + distances( t3, t4 ) - distances( t2, t3 ) - distances( t1, t4 );
           if ( gainFirstBridge <= tolerance ) {
             continue;
           }
@@ -939,8 +1006,8 @@ double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >
                     continue;
                   }
                   double gain2 =
-                    t8choice == t6choice ? distances[ t5 ][ t6 ] + distances[ t7 ][ t8 ] - distances[ t6 ][ t7 ] - distances[ t5 ][ t8 ]
-                                         : distances[ t5 ][ t6 ] + distances[ t7 ][ t8 ] - distances[ t5 ][ t7 ] - distances[ t6 ][ t8 ];
+                    t8choice == t6choice ? distances( t5, t6 ) + distances( t7, t8 ) - distances( t6, t7 ) - distances( t5, t8 )
+                                         : distances( t5, t6 ) + distances( t7, t8 ) - distances( t5, t7 ) - distances( t6, t8 );
                   if ( gainFirstBridge + gain2 > maxGain ) {
                     maxGain = gainFirstBridge + gain2;
                     bestTs = { t1, t2, t3, t4, t5, t6, t7, t8 };
@@ -968,7 +1035,7 @@ double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >
                     }
 
                     double gain3 =
-                      distances[ t5 ][ t6 ] + distances[ t7 ][ t8 ] + distances[ t9 ][ t10 ] - distances[ t6 ][ t7 ] - distances[ t8 ][ t9 ] - distances[ t10 ][ t5 ];
+                      distances( t5, t6 ) + distances( t7, t8 ) + distances( t9, t10 ) - distances( t6, t7 ) - distances( t8, t9 ) - distances( t10, t5 );
                     if ( gainFirstBridge + gain3 > maxGain ) {
                       maxGain = gainFirstBridge + gain3;
                       bestTs = { t1, t2, t3, t4, t5, t6, t7, t8, t9, t10 };
@@ -1005,7 +1072,7 @@ double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >
   }
 
   bool INLINE_ATTRIBUTE improveTour23_( vector< size_t >& tour,
-                                        const vector< vector< double > >& distances,
+                                        const VDistances& distances,
                                         const vector< vector< size_t > >& nearestNeighbors )
   {
     if ( tour.size() < 5 ) {
@@ -1032,7 +1099,7 @@ double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >
                                          double& bestInfeasibleG,
                                          const vector< size_t >& tour,
                                          const vector< size_t >& position,
-                                         const vector< vector< double > >& distances,
+                                         const VDistances& distances,
                                          const vector< vector< size_t > >& nearestNeighbors )
   {
     assert( ts.size() > 1 );
@@ -1040,7 +1107,7 @@ double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >
     vector< pair< size_t, size_t > > tcTdPairs;
     for ( size_t tcIndex = 0; tcIndex < nearestNeighbors[ tb ].size(); ++tcIndex ) {
       size_t tc = nearestNeighbors[ tb ][ tcIndex ];
-      double G1 = G0 - distances[ tb ][ tc ];
+      double G1 = G0 - distances( tb, tc );
       if ( G1 <= tolerance ) {
         continue;
       }
@@ -1052,8 +1119,8 @@ double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >
       for ( size_t tdChoice = 0; tdChoice < 2; ++tdChoice ) {
         size_t td = tdChoice == 0 ? previous_( tc, tour, position ) : next_( tc, tour, position );
         if ( depth + 1 == k ) {
-          double G2 = G1 + distances[ tc ][ td ];
-          if ( G2 - distances[ ts.front() ][ td ] <= tolerance && ( G2 <= bestG && G2 <= bestInfeasibleG ) ) {
+          double G2 = G1 + distances( tc, td );
+          if ( G2 - distances( ts.front(), td ) <= tolerance && ( G2 <= bestG && G2 <= bestInfeasibleG ) ) {
             continue;
           }
           if ( find( added.begin(), added.end(), make_pair( tc, td ) ) != added.end() ) {
@@ -1066,15 +1133,17 @@ double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >
         tcTdPairs.push_back( make_pair( tc, td ) );
       }
     }
-    sort( tcTdPairs.begin(), tcTdPairs.end(), [&] ( const pair< size_t, size_t >& p1,
+/*    sort( tcTdPairs.begin(), tcTdPairs.end(), [&] ( const pair< size_t, size_t >& p1,
                                                     const pair< size_t, size_t >& p2 ) {
       const size_t tc1 = p1.first;
       const size_t td1 = p1.second;
       const size_t tc2 = p2.first;
       const size_t td2 = p2.second;
-      return distances[ tc1 ][ td1 ] - distances[ tb ][ tc1 ]
-             < distances[ tc2 ][ td2 ] - distances[ tb ][ tc2 ];
+      return distances( tc1, td1 ) - distances( tb, tc1 )
+             < distances( tc2, td2 ) - distances( tb, tc2 );
     } );
+    */
+    reverse( tcTdPairs.begin(), tcTdPairs.end() );
 
     while ( !tcTdPairs.empty() ) {
       size_t tc = tcTdPairs.back().first;
@@ -1083,9 +1152,9 @@ double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >
 
       ts.push_back( tc );
       ts.push_back( td );
-      double G1 = G0 - distances[ tb ][ tc ];
-      double G2 = G1 + distances[ tc ][ td ];
-      double gain = G2 - distances[ ts.front() ][ ts.back() ];
+      double G1 = G0 - distances( tb, tc );
+      double G2 = G1 + distances( tc, td );
+      double gain = G2 - distances( ts.front(), ts.back() );
       if ( gain > tolerance && makesTour_( ts, tour, position ) ) {
         return gain;
       }
@@ -1132,7 +1201,7 @@ double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >
   bool INLINE_ATTRIBUTE kOptOuterLoop_( size_t k,
                                         vector< size_t >& tour,
                                         vector< bool >& dontLook,
-                                        const vector< vector< double > >& distances,
+                                        const VDistances& distances,
                                         const vector< vector< size_t > >& nearestNeighbors,
                                         bool linKernighan )
   {
@@ -1148,9 +1217,12 @@ double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >
       bool found = false;
       for ( size_t t2choice = 0; t2choice < 2; ++t2choice ) {
         size_t t2 = t2choice == 0 ? previous_( t1, tour, position ) : next_( t1, tour, position );
+        if ( inBetterTour( t1, t2 ) ) {
+          continue;
+        }
 
         vector< size_t > ts( { t1, t2 } );
-        double G0 = distances[ t1 ][ t2 ];
+        double G0 = distances( t1, t2 );
         vector< pair< size_t, size_t > > added;
         vector< pair< size_t, size_t > > removed( { make_pair( t1, t2 ), make_pair( t2, t1 ) } );
         vector< size_t > bestTs;
@@ -1244,7 +1316,7 @@ double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >
   bool INLINE_ATTRIBUTE improveTourKOpt_( size_t k,
                                           bool linKernighan,
                                           vector< size_t >& tour,
-                                          const vector< vector< double > >& distances,
+                                          const VDistances& distances,
                                           const vector< vector< size_t > >& nearestNeighbors )
   {
     vector< bool > dontLook( tour.size(), false );
@@ -1257,7 +1329,7 @@ double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >
       }
 
       vector< bool > dontLook4( tour.size(), false );
-     while ( improveTour23InnerLoop_( tour, dontLook4, dontLook, distances, nearestNeighbors ) ) {
+      while ( improveTour23InnerLoop_( tour, dontLook4, dontLook, distances, nearestNeighbors ) ) {
         change4 = true;
         change = true;
       }
@@ -1307,11 +1379,12 @@ double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >
 
   bool INLINE_ATTRIBUTE improveTourIterated_( function< bool ( vector< size_t >&,
                                                                vector< bool >&,
-                                                               const vector< vector< double > >&,
+                                                               const VDistances&,
                                                                const vector< vector< size_t > >& ) > improveTour,
                                               size_t iterations,
+                                              bool useGain23,
                                               vector< size_t >& tour,
-                                              const vector< vector< double > >& distances,
+                                              const VDistances& distances,
                                               const vector< vector< size_t > >& nearestNeighbors )
   {
     assert( tour.size() > 8 );
@@ -1319,140 +1392,228 @@ double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >
     vector< bool > dontLook( tour.size(), false );
     vector< size_t > bestTour( tour );
     double bestLength = getLength_( tour, distances );
+    vector< size_t > tour1( tour ), tour2( tour );
+    vector< vector< size_t > > nn( nearestNeighbors );
     for ( size_t i = 0; i < iterations; ++i ) {
       bool change4 = true;
       while ( change4 ) {
         change4 = false;
-        while ( improveTour( tour, dontLook, distances, nearestNeighbors ) ) {
+        while ( improveTour( tour, dontLook, distances, nn ) ) {
           change = true;
         }
 
-        vector< bool > dontLook4( tour.size(), false );
-        while ( improveTour23InnerLoop_( tour, dontLook4, dontLook, distances, nearestNeighbors ) ) {
-          change4 = true;
-          change = true;
+        if ( useGain23 ) {
+          vector< bool > dontLook4( tour.size(), false );
+          while ( improveTour23InnerLoop_( tour, dontLook4, dontLook, distances, nn ) ) {
+            change4 = true;
+            change = true;
+          }
         }
       }
       double length = getLength_( tour, distances );
       if ( length < bestLength ) {
         bestTour = tour;
         bestLength = length;
+        better = bestTour;
+        updateNearest( tour, tour1, tour2, nn );
       }
       if ( i + 1 == iterations ) {
         break;
       }
       tour = bestTour;
-      kSwapKick( 4, tour, dontLook );
+      kSwapKick( 6, tour, dontLook );
     }
     tour = bestTour;
     return change;
   }
 
-  bool INLINE_ATTRIBUTE improveTourIterated3Opt_( size_t iterations,
+  bool INLINE_ATTRIBUTE improveTourIterated2Opt_( size_t iterations,
+                                                  bool useGain23,
                                                   vector< size_t >& tour,
-                                                  const vector< vector< double > >& distances,
+                                                  const VDistances& distances,
                                                   const vector< vector< size_t > >& nearestNeighbors )
   {
-    return improveTourIterated_( &threeOptInnerLoop_, iterations, tour, distances, nearestNeighbors );
+    return improveTourIterated_( &twoOptInnerLoop_, iterations, useGain23, tour, distances, nearestNeighbors );
+  }
+
+  bool INLINE_ATTRIBUTE improveTourIterated3Opt_( size_t iterations,
+                                                  bool useGain23,
+                                                  vector< size_t >& tour,
+                                                  const VDistances& distances,
+                                                  const vector< vector< size_t > >& nearestNeighbors )
+  {
+    return improveTourIterated_( &threeOptInnerLoop_, iterations, useGain23, tour, distances, nearestNeighbors );
   }
 
   bool INLINE_ATTRIBUTE improveTourIteratedLKH_( size_t k,
                                                  size_t iterations,
+                                                 bool useGain23,
                                                  bool linKernighan,
                                                  vector< size_t >& tour,
-                                                 const vector< vector< double > >& distances,
+                                                 const VDistances& distances,
                                                  const vector< vector< size_t > >& nearestNeighbors )
   {
     auto improveTour = [ k, linKernighan ] ( vector< size_t >& tour,
                                              vector< bool >& dontLook,
-                                             const vector< vector< double > >& distances,
+                                             const VDistances& distances,
                                              const vector< vector< size_t > >& nearestNeighbors ) {
       return kOptOuterLoop_( k, tour, dontLook, distances, nearestNeighbors, linKernighan );
     };
-    return improveTourIterated_( improveTour, iterations, tour, distances, nearestNeighbors );
+    return improveTourIterated_( improveTour, iterations, useGain23, tour, distances, nearestNeighbors );
   }
 
-  } // anonymous namespace
+  double inline distanceRound( double d ) { return double( long( d + 0.5 ) ); }
+} // anonymous namespace
 
-  vector< size_t > INLINE_ATTRIBUTE TravelingSalespersonProblemSolver::computeTour( const vector< vector< double > >& distances )
+// VDistances
+VDistances::VDistances( const vector< vector< double > >& points,
+                        function< double ( double ) > rounding ) :
+  rounding_( rounding )
+{
+  for ( size_t i = 1; i < points.size(); ++i ) {
+    assert( points[ i ].size() == points[ 0 ].size() );
+  }
+}
+bool VDistances::empty() const { return size() == 0; }
+double VDistances::computeDistance_( const vector< double >& point1, const vector< double >& point2 ) const
+{
+  double dist = 0.0;
+  for ( size_t i = 0; i < point1.size(); ++i ) {
+    double diff = point1[ i ] - point2[ i ];
+    dist += diff * diff;
+  }
+  return rounding_( sqrt( dist ) );
+}
+
+// MatrixDistances
+MatrixDistances::MatrixDistances( const vector< vector< double > >& points,
+                                  function< double ( double ) > rounding ) :
+  VDistances( points, rounding )
+{
+  distances_.assign( points.size(), vector< double >( points.size(), 0.0 ) );
+  for ( size_t i = 0; i < points.size(); ++i ) {
+    for ( size_t j = i + 1; j < points.size(); ++j ) {
+      distances_[ i ][ j ] = distances_[ j ][ i ] = computeDistance_( points[ i ], points[ j ] );
+    }
+  }
+}
+double MatrixDistances::operator()( size_t i, size_t j ) const { return distances_[ i ][ j ]; }
+size_t MatrixDistances::size() const { return distances_.size(); }
+void MatrixDistances::setMatrix( vector< vector< double > >& distances )
+{
+  for ( size_t i = 0; i < distances.size(); ++i ) {
+    assert( distances[ i ].size() == distances.size() );
+    assert( distances[ i ][ i ] == 0.0 );
+    for ( size_t j = i + 1; j < distances[ i ].size(); ++j ) {
+      assert( fabs( distances[ i ][ j ] - distances[ j ][ i ] ) < 1e-9 );
+      assert( distances[ i ][ j ] >= 0.0 );
+    }
+  }
+  distances_ = distances;
+}
+
+// MatrixRoundedDistances
+MatrixRoundedDistances::MatrixRoundedDistances( const vector< vector< double > >& points ) :
+  MatrixDistances( points, [] ( double d ) { return distanceRound( d ); } )
+{}
+
+// OnTheFlyDistances
+OnTheFlyDistances::OnTheFlyDistances( const vector< vector< double > >& points,
+                                  function< double ( double ) > rounding ) :
+  VDistances( points, rounding ),
+  points_( points )
+{
+  for ( size_t i = 0; i < points_.size(); ++i ) {
+    assert( points_[ i ].size() == points_[ 0 ].size() );
+  }
+}
+double OnTheFlyDistances::operator()( size_t i, size_t j ) const { return computeDistance_( points_[ i ], points_[ j ] ); }
+size_t OnTheFlyDistances::size() const { return points_.size(); }
+
+// OnTheFlyRoundedDistances
+OnTheFlyRoundedDistances::OnTheFlyRoundedDistances( const vector< vector< double > >& points ) :
+  OnTheFlyDistances( points, [] ( double d ) { return distanceRound( d ); } )
+{}
+
+vector< size_t > INLINE_ATTRIBUTE TravelingSalespersonProblemSolver::computeTour( const VDistances& distances )
+{
   {
+    double start( clock() );
+    cerr << "Starting sanity check ... ";
     assert( !distances.empty() );
     for ( size_t i = 0; i < distances.size(); ++i ) {
-      assert( distances.size() == distances[ i ].size() );
       for ( size_t j = 0; j < distances.size(); ++j ) {
-        assert( fabs( distances[ i ][ j ] - distances[ j ][ i ] ) < 1e-9 );
+        assert( fabs( distances( i, j ) - distances( j, i ) ) < 1e-9 );
         if ( i != j ) {
-          assert( distances[ i ][ j ] > 0.0 );
+          assert( distances( i, j ) > 0.0 );
         }
         else {
-          if ( distances[ i][i ] != 0.0 ) {
-            cerr << "i " << i << " " << distances[ i ][ i ] << endl;
+          if ( distances( i, i ) != 0.0 ) {
+            cerr << "i " << i << " " << distances( i, i ) << endl;
           }
-          assert( distances[ i ][ i ] == 0.0 );
+          assert( distances( i, i ) == 0.0 );
         }
       }
     }
-    const vector< size_t > tourRand = getRandomTour_( distances );
-    const vector< size_t > tourNN = getNearestNeighborTour_( distances );
-    const vector< size_t > tourGreedy = getGreedyTour_( distances );
-    vector< size_t > tour( tourGreedy );
-    cerr << setprecision( 8 );
+    double timeSanity( ( clock() - start ) / CLOCKS_PER_SEC );
+    cerr << "DONE: " << timeSanity << endl;
+  }
+  double start( clock() );
+  const vector< size_t > tourRand = getRandomTour_( distances );
+  double timeRand( ( clock() - start ) / CLOCKS_PER_SEC );
+  start = clock();
+  const vector< size_t > tourNN = getNearestNeighborTour_( distances );
+  double timeNN( ( clock() - start ) / CLOCKS_PER_SEC );
+  cerr << setprecision( 8 );
 
-    vector< vector< size_t > > nearestNeighbors( distances.size() );
-    vector< vector< size_t > > nearestNeighbors5( distances.size() );
-    vector< vector< size_t > > nearestNeighbors10( distances.size() );
-    vector< vector< size_t > > nearestNeighbors30( distances.size() );
-    vector< vector< size_t > > helsgaun10( distances.size() );
-    vector< vector< size_t > > helsgaun5( distances.size() );
-    vector< vector< double > > helsgaunDistances;
-    {
-      double start( clock() );
-      nearestNeighbors30 = computeNearestNeighbors_( distances, 30 );
-      double timeNN( ( clock() - start ) / CLOCKS_PER_SEC );
-      start = clock();
-      helsgaun10 = computeHelsgaunNeighbors_( distances, helsgaunDistances, 10 );
-      double timeHelsgaun( ( clock() - start ) / CLOCKS_PER_SEC );
-      start = clock();
-      if ( false ) {
-        vector< size_t > helsgainInitialTour = getHelsgaunInitialTour_( nearestNeighbors30, helsgaunDistances, tourGreedy );
+  vector< vector< size_t > > nearestNeighbors5( distances.size() );
+  vector< vector< size_t > > nearestNeighbors10( distances.size() );
+  vector< vector< size_t > > nearestNeighbors20( distances.size() );
+  vector< vector< size_t > > nearestNeighbors30( distances.size() );
+  vector< vector< size_t > > helsgaun10( distances.size() );
+  vector< vector< size_t > > helsgaun5( distances.size() );
+  vector< vector< double > > helsgaunDistances10;
+  {
+    double start( clock() );
+    nearestNeighbors30 = computeNearestNeighbors_( distances, 30 );
+    double timeNN( ( clock() - start ) / CLOCKS_PER_SEC );
+    start = clock();
+    helsgaun10 = computeHelsgaunNeighbors_( distances, helsgaunDistances10, 10 );
+    double timeHelsgaun( ( clock() - start ) / CLOCKS_PER_SEC );
+    start = clock();
+    for ( size_t i = 0; i < distances.size(); ++i ) {
+      nearestNeighbors5[ i ] = vector< size_t >( nearestNeighbors30[ i ].begin(), nearestNeighbors30[ i ].begin() + min( size_t( 5 ), nearestNeighbors30[ i ].size() ) );
+      nearestNeighbors10[ i ] = vector< size_t >( nearestNeighbors30[ i ].begin(), nearestNeighbors30[ i ].begin() + min( size_t( 10 ), nearestNeighbors30[ i ].size() ) );
+      nearestNeighbors20[ i ] = vector< size_t >( nearestNeighbors30[ i ].begin(), nearestNeighbors30[ i ].begin() + min( size_t( 20 ), nearestNeighbors30[ i ].size() ) );
+      helsgaun5[ i ] = vector< size_t >( helsgaun10[ i ].begin(), helsgaun10[ i ].begin() + min( size_t( 5 ), helsgaun10[ i ].size() ) );
+    }
+    auto addVector = [&] ( vector< vector< size_t > >& nn, const vector< vector< size_t > >& hn ) {
+      assert( nn.size() == hn.size() );
+      for ( size_t i = 0; i < nn.size(); ++i ) {
+        nn[ i ].insert( nn[ i ].begin(), hn[ i ].begin(), hn[ i ].end() );
+        vector< size_t >::iterator it = remove_if( nn[ i ].begin() + hn[ i ].size(), nn[ i ].end(),
+                                                   [&] ( size_t index ) { return find( hn[ i ].begin(), hn[ i ].end(), index ) != hn[ i ].end(); } );
+        nn[ i ].resize( it - nn[ i ].begin() );
       }
-      for ( size_t i = 0; i < distances.size(); ++i ) {
-        nearestNeighbors5[ i ] = vector< size_t >( nearestNeighbors30[ i ].begin(), nearestNeighbors30[ i ].begin() + min( size_t( 5 ), nearestNeighbors30[ i ].size() ) );
-        nearestNeighbors10[ i ] = vector< size_t >( nearestNeighbors30[ i ].begin(), nearestNeighbors30[ i ].begin() + min( size_t( 10 ), nearestNeighbors30[ i ].size() ) );
-        nearestNeighbors[ i ] = vector< size_t >( nearestNeighbors30[ i ].begin(), nearestNeighbors30[ i ].begin() + min( size_t( 20 ), nearestNeighbors30[ i ].size() ) );
-        helsgaun5[ i ] = vector< size_t >( helsgaun10[ i ].begin(), helsgaun10[ i ].begin() + min( size_t( 5 ), helsgaun10[ i ].size() ) );
-      }
-      for ( size_t i = 0; i < nearestNeighbors30.size(); ++i ) {
-        for ( size_t ji = helsgaun10[ i ].size(); ji > 0; --ji ) {
-          size_t j = ji - 1;
-          if ( find( nearestNeighbors30[ i ].begin(), nearestNeighbors30[ i ].end(), helsgaun10[ i ][ j ] ) == nearestNeighbors30[ i ].end() ) {
-            nearestNeighbors30[ i ].insert( nearestNeighbors30[ i ].begin(), helsgaun10[ i ][ j ] );
-          }
-        }
-        for ( size_t ji = helsgaun5[ i ].size(); ji > 0; --ji ) {
-          size_t j = ji - 1;
-          if ( find( nearestNeighbors10[ i ].begin(), nearestNeighbors10[ i ].end(), helsgaun5[ i ][ j ] ) == nearestNeighbors10[ i ].end() ) {
-            nearestNeighbors10[ i ].insert( nearestNeighbors10[ i ].begin(), helsgaun5[ i ][ j ] );
-          }
-          if ( find( nearestNeighbors5[ i ].begin(), nearestNeighbors5[ i ].end(), helsgaun5[ i ][ j ] ) == nearestNeighbors5[ i ].end() ) {
-            nearestNeighbors5[ i ].insert( nearestNeighbors5[ i ].begin(), helsgaun5[ i ][ j ] );
-          }
-        }
-      }
-      /*    for ( size_t i = 0; i < nearestNeighbors5.size(); ++i ) {
-            for ( size_t j = 0; j < nearestNeighbors5[ i ].size(); ++j ) {
-            cerr << nearestNeighbors5[ i ][ j ] << " ";
-            }
-            cerr << endl;
-            }
-            */
+    };
+    addVector( nearestNeighbors30, helsgaun10 );
+    addVector( nearestNeighbors20, helsgaun5 );
+    addVector( nearestNeighbors10, helsgaun5 );
+    addVector( nearestNeighbors5, helsgaun5 );
+
     double time( ( clock() - start ) / CLOCKS_PER_SEC );
     cerr << "Time to compute " << nearestNeighbors30.front().size() << " nearest neighbors: " << timeNN << endl;
     cerr << "Time to compute " << helsgaun10.front().size() << " Helsgaun neighbors: " << timeHelsgaun << endl;
     cerr << "Time to compute rest " << time << endl;
   }
 
-  cerr << "Greedy distance: " << getLength_( tourGreedy, distances ) << endl;
+  start = clock();
+  const vector< size_t > tourGreedy = getGreedyTour_( distances );
+  double timeGreedy( ( clock() - start ) / CLOCKS_PER_SEC );
+  vector< size_t > tour( tourGreedy );
+
+  cerr << "TimeRand: " << timeRand << ", timeNN " << timeNN << endl;
+  cerr << "Greedy distance: " << getLength_( tourGreedy, distances ) << ", time: " << timeGreedy << endl;
   if ( distances.size() < 10 ) {
     tour = getBruteForceTour_( distances );
   }
@@ -1486,9 +1647,9 @@ double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >
     tour = tourGreedy;
     double start( clock() );
     improveTour3Opt_( tour, distances, nearestNeighbors30 );
-    improveTour23_( tour, distances, nearestNeighbors );
+    improveTour23_( tour, distances, nearestNeighbors20 );
     improveTour3Opt_( tour, distances, nearestNeighbors30 );
-    improveTour23_( tour, distances, nearestNeighbors );
+    improveTour23_( tour, distances, nearestNeighbors20 );
     improveTour3Opt_( tour, distances, nearestNeighbors30 );
     double time( ( clock() - start ) / CLOCKS_PER_SEC );
     cerr << "4-opt tour distance: " << getLength_( tour, distances ) << ", time: " << time << endl;
@@ -1497,9 +1658,9 @@ double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >
   if ( true ) {
     tour = tourGreedy;
     double start( clock() );
-    improveTourKOpt_( 5, false, tour, distances, nearestNeighbors );
+    improveTourKOpt_( 5, false, tour, distances, nearestNeighbors20 );
     improveTour3Opt_( tour, distances, nearestNeighbors30 );
-    improveTour23_( tour, distances, nearestNeighbors );
+    improveTour23_( tour, distances, nearestNeighbors20 );
     improveTour3Opt_( tour, distances, nearestNeighbors30 );
     double time( ( clock() - start ) / CLOCKS_PER_SEC );
     cerr << "5-opt tour distance: " << getLength_( tour, distances ) << ", time: " << time << endl;
@@ -1508,7 +1669,15 @@ double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >
   if ( false ) {
     tour = tourGreedy;
     double start( clock() );
-    improveTourIterated3Opt_( 1000, tour, distances, nearestNeighbors10 );
+    improveTourIterated2Opt_( 1000, false, tour, distances, nearestNeighbors5 );
+    double time( ( clock() - start ) / CLOCKS_PER_SEC );
+    cerr << "I2    tour distance: " << getLength_( tour, distances ) << ", time: " << time << endl;
+  }
+
+  if ( true ) {
+    tour = tourGreedy;
+    double start( clock() );
+    improveTourIterated3Opt_( 1000, false, tour, distances, nearestNeighbors30 );
     double time( ( clock() - start ) / CLOCKS_PER_SEC );
     cerr << "I3    tour distance: " << getLength_( tour, distances ) << ", time: " << time << endl;
   }
@@ -1520,9 +1689,20 @@ double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >
       vector< size_t > tour1( tour );
       vector< size_t > tour2( tour );
       vector< vector< size_t > > nn( nearestNeighbors5 );
-      while ( improveTourKOpt_( k, true, tour, distances, nn ) ) {
-        updateNearest( tour, tour1, tour2, nn );
+      vector< size_t > bestTour( tour );
+      vector< vector< double > > points;
+      for ( size_t i = 0; i < 10; ++i ) {
+        tour = getHelsgaunInitialTour_( nn, helsgaun10, helsgaunDistances10, bestTour );
+        bool useGain23 = true;
+        while ( improveTourKOpt_( k, useGain23, tour, distances, nn ) ) {
+          updateNearest( tour, tour1, tour2, nn );
+        }
+        if ( getLength_( tour, distances ) < getLength_( bestTour, distances ) ) {
+          bestTour = tour;
+          better = bestTour;
+        }
       }
+      tour = bestTour;
 
       double time( ( clock() - start ) / CLOCKS_PER_SEC );
       cerr << k << "-LK  tour distance: " << getLength_( tour, distances ) << ", time: " << time << endl;
@@ -1533,7 +1713,9 @@ double INLINE_ATTRIBUTE getHeldKarpLowerBound_( const vector< vector< double > >
     if ( true ) {
       tour = tourGreedy;
       double start( clock() );
-      improveTourIteratedLKH_( k, 100, true, tour, distances, nearestNeighbors5 );
+      bool useGain23 = false;
+      bool linKernighan = true;
+      improveTourIteratedLKH_( k, 100, useGain23, linKernighan, tour, distances, nearestNeighbors5 );
 
       double time( ( clock() - start ) / CLOCKS_PER_SEC );
       cerr << k << "-ILK tour distance: " << getLength_( tour, distances ) << ", time: " << time << endl;

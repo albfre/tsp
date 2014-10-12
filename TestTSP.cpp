@@ -11,7 +11,6 @@
 #include <fstream>
 #include <vector>
 
-#include "hex3000.h"
 #include "TravelingSalespersonProblemSolver.h"
 
 using namespace std;
@@ -49,7 +48,6 @@ void testTSPRegular( size_t numOfPoints )
   numOfPoints = points.size();
   cerr << "numPoints: " << numOfPoints << endl;
 
-
   vector< vector< double > > distances( numOfPoints + 1, vector< double >( numOfPoints + 1, 1e5 ) );
   for ( size_t i = 0; i < numOfPoints; ++i ) {
     for ( size_t j = i + 1; j < numOfPoints; ++j ) {
@@ -62,9 +60,12 @@ void testTSPRegular( size_t numOfPoints )
   distances.back()[ 0 ] = 1e-6;
   distances[ 0 ].back() = 1e-6;
 
+  MatrixDistances distanceMat( points );
+  distanceMat.setMatrix( distances );
+
   cout << "Running test on regular instance with " << numOfPoints << " points." << endl;
   double start( clock() );
-  vector< size_t > path = computeTour( distances );
+  vector< size_t > path = computeTour( distanceMat );
   size_t ii = find( path.begin(), path.end(), numOfPoints ) - path.begin();
   cerr << "First point: " << path[ ( ii + 1 ) % path.size() ] << " " << path[ ( ii + path.size() - 1 ) % path.size() ] << endl;
   cout << "CPU seconds to run test: " << setprecision( 4 ) << ( clock() - start ) / CLOCKS_PER_SEC << endl;;
@@ -114,38 +115,21 @@ void testTSPLib( string name )
 {
   vector< vector< double > > points = readTSP( name );
   size_t numOfPoints = points.size();
-  vector< vector< double > > distances( numOfPoints, vector< double >( numOfPoints ) );
-  for ( size_t i = 0; i < numOfPoints; ++i ) {
-    for ( size_t j = i + 1; j < numOfPoints; ++j ) {
-      distances[ i ][ j ] = computeDistance( points[ i ], points[ j ] );
-      distances[ i ][ j ] = double( long( distances[ i ][ j ] + 0.5 ) );
-      distances[ j ][ i ] = distances[ i ][ j ];
-    }
-    distances[ i ][ i ] = 0.0;
+  vector< vector< double > > emptyPoints;
+  bool useFullMatrix = numOfPoints < 5000;
+  MatrixRoundedDistances mDistances( useFullMatrix ? points : emptyPoints );
+  OnTheFlyRoundedDistances sDistances( useFullMatrix ? emptyPoints : points );
+  VDistances* distances;
+  if ( useFullMatrix ) {
+    distances = &mDistances;
+  }
+  else {
+    distances = &sDistances;
   }
 
   cout << "Running test on " + name + " with " << numOfPoints << " points." << endl;
   double start( clock() );
-  vector< size_t > path = computeTour( distances );
-  cout << "CPU seconds to run test: " << setprecision( 4 ) << ( clock() - start ) / CLOCKS_PER_SEC << endl;;
-}
-
-void testTSPHex( int arg )
-{
-  vector< vector< double > > points = getHex();
-  size_t numOfPoints = points.size();
-  vector< vector< double > > distances( numOfPoints, vector< double >( numOfPoints ) );
-  for ( size_t i = 0; i < numOfPoints; ++i ) {
-    for ( size_t j = i + 1; j < numOfPoints; ++j ) {
-      distances[ i ][ j ] = computeDistance( points[ i ], points[ j ] );
-      distances[ j ][ i ] = distances[ i ][ j ];
-    }
-    distances[ i ][ i ] = 0.0;
-  }
-
-  cout << "Running test on random instance with " << numOfPoints << " points." << endl;
-  double start( clock() );
-  vector< size_t > path = computeTour( distances );
+  vector< size_t > path = computeTour( *distances );
   cout << "CPU seconds to run test: " << setprecision( 4 ) << ( clock() - start ) / CLOCKS_PER_SEC << endl;;
 }
 
@@ -159,16 +143,8 @@ void testTSPRandom( size_t numOfPoints )
   for ( size_t i = 0; i < numOfPoints; ++i ) {
     points[ i ][ 0 ] = double( rand() ) / RAND_MAX;
     points[ i ][ 1 ] = double( rand() ) / RAND_MAX;
-//    cerr << points[ i ][ 0 ] << " " << points[ i ][ 1 ] << endl;
   }
-  vector< vector< double > > distances( numOfPoints, vector< double >( numOfPoints ) );
-  for ( size_t i = 0; i < numOfPoints; ++i ) {
-    for ( size_t j = i + 1; j < numOfPoints; ++j ) {
-      distances[ i ][ j ] = computeDistance( points[ i ], points[ j ] );
-      distances[ j ][ i ] = distances[ i ][ j ];
-    }
-    distances[ i ][ i ] = 0.0;
-  }
+  MatrixDistances distances( points );
 
   cout << "Running test on random instance with " << numOfPoints << " points." << endl;
   double start( clock() );
@@ -197,14 +173,7 @@ void testTSPRandomClusters( size_t numOfPoints )
     }
   }
   numOfPoints = points.size();
-  vector< vector< double > > distances( numOfPoints, vector< double >( numOfPoints ) );
-  for ( size_t i = 0; i < numOfPoints; ++i ) {
-    for ( size_t j = i + 1; j < numOfPoints; ++j ) {
-      distances[ i ][ j ] = computeDistance( points[ i ], points[ j ] );
-      distances[ j ][ i ] = distances[ i ][ j ];
-    }
-    distances[ i ][ i ] = 0.0;
-  }
+  MatrixDistances distances( points );
 
   cout << "Running test on random instance with " << numOfPoints << " points and " << numOfClusters << " clusters." << endl;
   double start( clock() );
@@ -229,9 +198,7 @@ int main( int argc, const char* argv[] )
       case 0: testTSPRegular( atoi( argv[ 2 ] ) ); break;
       case 1: testTSPLib( "pcb1173" ); break;
       case 2: testTSPRandomClusters( atoi( argv[ 2 ] ) ); break;
-      case 3: testTSPHex( atoi( argv[ 2 ] ) ); break;
       default: testTSPLib( string( argv[ 2 ] ) );
     }
   }
 }
-
