@@ -1,5 +1,5 @@
-#ifndef TRAVELING_SALESPERSON_H
-#define TRAVELING_SALESPERSON_H
+#ifndef TRAVELING_SALESPERSON_PROBLEM_SOLVER_H
+#define TRAVELING_SALESPERSON_PROBLEM_SOLVER_H
 
 #include <cstddef>
 #include <vector>
@@ -14,6 +14,7 @@ namespace TravelingSalespersonProblemSolver {
       virtual size_t size() const = 0;
       bool empty() const;
     protected:
+      double computeDistance_( const double* point1, const double* point2, size_t pointDimension ) const;
       double computeDistance_( const std::vector< double >& point1, const std::vector< double >& point2 ) const;
       std::function< double ( double ) > rounding_;
   };
@@ -26,7 +27,8 @@ namespace TravelingSalespersonProblemSolver {
       virtual size_t size() const;
       void setMatrix( std::vector< std::vector< double > >& distances );
     private:
-      std::vector< std::vector< double > > distances_;
+      size_t size_;
+      std::vector< double > distances_;
   };
 
   class MatrixRoundedDistances : public MatrixDistances {
@@ -37,12 +39,14 @@ namespace TravelingSalespersonProblemSolver {
   class OnTheFlyDistances : public VDistances {
     public:
       OnTheFlyDistances( const std::vector< std::vector< double > >& points,
-                       std::function< double ( double ) > rounding = [] ( double d ) { return d; } );
+                         std::function< double ( double ) > rounding = [] ( double d ) { return d; } );
       virtual double operator()( size_t i, size_t j ) const;
       virtual size_t size() const;
 
     private:
-      const std::vector< std::vector< double > > points_;
+      const size_t size_;
+      const size_t pointDimension_;
+      std::vector< double > points_;
   };
 
   class OnTheFlyRoundedDistances : public OnTheFlyDistances {
@@ -53,4 +57,4 @@ namespace TravelingSalespersonProblemSolver {
   std::vector< size_t > computeTour( const VDistances& distances );
 }
 
-#endif
+#endif // TRAVLING_SALESPERSON_PROBLEM_SOLVER_H

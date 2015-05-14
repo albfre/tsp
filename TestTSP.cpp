@@ -116,7 +116,7 @@ void testTSPLib( string name )
   vector< vector< double > > points = readTSP( name );
   size_t numOfPoints = points.size();
   vector< vector< double > > emptyPoints;
-  bool useFullMatrix = numOfPoints < 5000;
+  bool useFullMatrix = numOfPoints < 2000;
   MatrixRoundedDistances mDistances( useFullMatrix ? points : emptyPoints );
   OnTheFlyRoundedDistances sDistances( useFullMatrix ? emptyPoints : points );
   VDistances* distances;
