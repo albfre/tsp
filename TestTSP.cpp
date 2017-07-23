@@ -196,7 +196,7 @@ int main( int argc, const char* argv[] )
   else {
     switch ( atoi( argv[ 1 ] ) ) {
       case 0: testTSPRegular( atoi( argv[ 2 ] ) ); break;
-      case 1: testTSPLib( "pcb1173" ); break;
+      case 1: testTSPLib( "pcb1173" ); break; // 56892
       case 2: testTSPRandomClusters( atoi( argv[ 2 ] ) ); break;
       default: testTSPLib( string( argv[ 2 ] ) );
     }

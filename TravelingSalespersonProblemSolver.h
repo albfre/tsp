@@ -6,6 +6,7 @@
 #include <functional>
 
 namespace TravelingSalespersonProblemSolver {
+
   class VDistances {
     public:
       VDistances( const std::vector< std::vector< double > >& points,
@@ -55,6 +56,7 @@ namespace TravelingSalespersonProblemSolver {
   };
 
   std::vector< size_t > computeTour( const VDistances& distances );
+
 }
 
 #endif // TRAVLING_SALESPERSON_PROBLEM_SOLVER_H
