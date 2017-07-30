@@ -11,6 +11,7 @@ namespace TravelingSalespersonProblemSolver {
     public:
       VDistances( const std::vector< std::vector< double > >& points,
                   std::function< double ( double ) > rounding );
+      virtual ~VDistances() {};
       virtual double operator()( size_t i, size_t j ) const = 0;
       virtual size_t size() const = 0;
       bool empty() const;
@@ -24,6 +25,7 @@ namespace TravelingSalespersonProblemSolver {
     public:
       MatrixDistances( const std::vector< std::vector< double > >& points,
                        std::function< double ( double ) > rounding = [] ( double d ) { return d; } );
+      virtual ~MatrixDistances() {};
       virtual double operator()( size_t i, size_t j ) const;
       virtual size_t size() const;
       void setMatrix( std::vector< std::vector< double > >& distances );
@@ -35,12 +37,14 @@ namespace TravelingSalespersonProblemSolver {
   class MatrixRoundedDistances : public MatrixDistances {
     public:
       MatrixRoundedDistances( const std::vector< std::vector< double > >& points );
+      virtual ~MatrixRoundedDistances() {};
   };
 
   class OnTheFlyDistances : public VDistances {
     public:
       OnTheFlyDistances( const std::vector< std::vector< double > >& points,
                          std::function< double ( double ) > rounding = [] ( double d ) { return d; } );
+      virtual ~OnTheFlyDistances() {};
       virtual double operator()( size_t i, size_t j ) const;
       virtual size_t size() const;
 
@@ -53,6 +57,7 @@ namespace TravelingSalespersonProblemSolver {
   class OnTheFlyRoundedDistances : public OnTheFlyDistances {
     public:
       OnTheFlyRoundedDistances( const std::vector< std::vector< double > >& points );
+      virtual ~OnTheFlyRoundedDistances() {};
   };
 
   std::vector< size_t > computeTour( const VDistances& distances );

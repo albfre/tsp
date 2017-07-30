@@ -48,15 +48,15 @@ namespace {
       bool found = false;
       double maxGain = 0.0;
       for ( const auto t2choice : { true, false } ) {
-        const size_t t2 = t2choice ? previous_( t1, tour, position ) : next_( t1, tour, position );
-        for ( const size_t t3 : nearestNeighbors[ t2 ] ) {
+        const auto t2 = t2choice ? previous_( t1, tour, position ) : next_( t1, tour, position );
+        for ( const auto& t3 : nearestNeighbors[ t2 ] ) {
           if ( t3 == previous_( t2, tour, position ) || t3 == next_( t2, tour, position ) ) {
             continue;
           }
           if ( distances( t2, t3 ) >= distances( t1, t2 ) ) {
             continue;
           }
-          const size_t t4 = t2choice ? next_( t3, tour, position ) : previous_( t3, tour, position );
+          const auto t4 = t2choice ? next_( t3, tour, position ) : previous_( t3, tour, position );
           const double gain = distances( t1, t2 ) + distances( t3, t4 ) - distances( t1, t4 ) - distances( t2, t3 );
           if ( gain > maxGain ) {
             maxGain = gain;
@@ -66,7 +66,7 @@ namespace {
       }
       if ( maxGain > tolerance ) {
         if ( !dontLook.empty() ) {
-          for ( const auto i : bestTs ) {
+          for ( const auto& i : bestTs ) {
             dontLook[ i ]= false;
           }
         }
@@ -98,8 +98,8 @@ namespace {
       bool found = false;
       double G = 0.0;
       for ( const auto t2choice : { true, false } ) {
-        const size_t t2 = t2choice ? previous_( t1, tour, position ) : next_( t1, tour, position );
-        for ( const auto t3 : nearestNeighbors[ t2 ] ) {
+        const auto t2 = t2choice ? previous_( t1, tour, position ) : next_( t1, tour, position );
+        for ( const auto& t3 : nearestNeighbors[ t2 ] ) {
           if ( t3 == previous_( t2, tour, position ) || t3 == next_( t2, tour, position ) ) {
             continue;
           }
@@ -108,7 +108,7 @@ namespace {
             continue;
           }
           // First choice of t4
-          size_t t4 = t2choice ? next_( t3, tour, position ) : previous_( t3, tour, position );
+          auto t4 = t2choice ? next_( t3, tour, position ) : previous_( t3, tour, position );
           if ( t4 == previous_( t2, tour, position ) || t4 == next_( t2, tour, position ) ) {
             continue;
           }
@@ -120,7 +120,7 @@ namespace {
               bestTs = { t1, t2, t3, t4 };
             }
           }
-          for ( const auto t5 : nearestNeighbors[ t4 ] ) {
+          for ( const auto& t5 : nearestNeighbors[ t4 ] ) {
             if ( t5 == previous_( t4, tour, position ) || t5 == next_( t4, tour, position ) ) {
               continue;
             }
@@ -130,7 +130,7 @@ namespace {
             }
 
             // Select t6 such that a valid tour is created
-            const size_t t6 = between_( t2, t4, t5, position ) ? next_( t5, tour, position ) : previous_( t5, tour, position );
+            const auto t6 = between_( t2, t4, t5, position ) ? next_( t5, tour, position ) : previous_( t5, tour, position );
             if ( t6 == t1 ) {
               continue;
             }
@@ -144,7 +144,7 @@ namespace {
 
           // Second choice of t4
           t4 = t2choice ? previous_( t3, tour, position ) : next_( t3, tour, position );
-          for ( const auto t5 : nearestNeighbors[ t4 ] ) {
+          for ( const auto& t5 : nearestNeighbors[ t4 ] ) {
             if ( t5 == previous_( t4, tour, position ) || t5 == next_( t4, tour, position ) ) {
               continue;
             }
@@ -158,7 +158,7 @@ namespace {
             }
             // Only consider one choice of t6. The other choice is possible, but clutters the code and doesn't lead to a significant improvement.
             const bool t6choice = t2choice;
-            const size_t t6 = t6choice ? next_( t5, tour, position ) : previous_( t5, tour, position );
+            const auto t6 = t6choice ? next_( t5, tour, position ) : previous_( t5, tour, position );
             if ( t6 == t3 || t6 == t2 || t6 == t1 ) {
               continue;
             }
@@ -209,31 +209,30 @@ namespace {
       double maxGain = 0.0;
       vector< size_t > incl;
       for ( const auto t2choice : { true } ) {
-        const size_t t2 = t2choice ? next_( t1, tour, position ) : previous_( t1, tour, position );
-        for ( const auto t3 : nearestNeighbors[ t2 ] ) {
-          const size_t t4 = t2choice == 0 ? next_( t3, tour, position ) : previous_( t3, tour, position );
+        const auto t2 = t2choice ? next_( t1, tour, position ) : previous_( t1, tour, position );
+        for ( const auto& t3 : nearestNeighbors[ t2 ] ) {
+          const auto t4 = t2choice == 0 ? next_( t3, tour, position ) : previous_( t3, tour, position );
           if ( t3 == t1 || t4 == t1 ) {
             continue;
           }
-          double gainFirstBridge = distances( t1, t2 ) + distances( t3, t4 ) - distances( t2, t3 ) - distances( t1, t4 );
+          const double gainFirstBridge = distances( t1, t2 ) + distances( t3, t4 ) - distances( t2, t3 ) - distances( t1, t4 );
           if ( gainFirstBridge <= tolerance ) {
             continue;
           }
 
           for ( size_t t5 = t2; t5 != t3; t5 = t2choice == 0 ? next_( t5, tour, position ) : previous_( t5, tour, position ) ) {
-            for ( size_t t6choice = 0; t6choice < 1; ++t6choice ) {
-              size_t t6 = t6choice == 0 ? next_( t5, tour, position ) : previous_( t5, tour, position );
+            for ( auto t6choice = 0; t6choice < 1; ++t6choice ) {
+              auto t6 = t6choice == 0 ? next_( t5, tour, position ) : previous_( t5, tour, position );
               if ( t5 == t2 && t6 == t1 ) {
                 continue;
               }
-              for ( size_t t7index = 0; t7index < nearestNeighbors[ t6 ].size(); ++t7index ) {
-                size_t t7 = nearestNeighbors[ t6 ][ t7index ];
-                for ( size_t t8choice = 0; t8choice < 2; ++t8choice ) {
-                  size_t t8 = t8choice == 0 ? next_( t7, tour, position ) : previous_( t7, tour, position );
+              for ( const auto& t7 : nearestNeighbors[ t6 ] ) {
+                for ( const auto t8choice : { true, false  } ) {
+                  const auto t8 = t8choice ? next_( t7, tour, position ) : previous_( t7, tour, position );
                   if ( !between_( t4, t1, t7, position ) || !between_( t4, t1, t8, position ) ) {
                     continue;
                   }
-                  double gain2 =
+                  const double gain2 =
                     t8choice == t6choice ? distances( t5, t6 ) + distances( t7, t8 ) - distances( t6, t7 ) - distances( t5, t8 )
                                          : distances( t5, t6 ) + distances( t7, t8 ) - distances( t5, t7 ) - distances( t6, t8 );
                   if ( gainFirstBridge + gain2 > maxGain ) {
@@ -247,9 +246,8 @@ namespace {
                     }
                   }
 
-                  for ( size_t t9index = 0; t9index < nearestNeighbors[ t8 ].size(); ++t9index ) {
-                    size_t t9 = nearestNeighbors[ t8 ][ t9index ];
-                    size_t t10 = t8choice == 0 || between_( t2, t3, t9, position ) ? previous_( t9, tour, position ) : next_( t9, tour, position );
+                  for ( const auto& t9 : nearestNeighbors[ t8 ] ) {
+                    const auto t10 = t8choice || between_( t2, t3, t9, position ) ? previous_( t9, tour, position ) : next_( t9, tour, position );
                     if ( //t9 == t5 || t9 == t6 || t9 == next_( t5, tour, position ) || t9 == previous_( t5, tour, position ) ||
                          ( t9 == t1 && t10 == t2 ) ||
                          ( t9 == t2 && t10 == t1 ) ||
@@ -262,7 +260,7 @@ namespace {
                       continue;
                     }
 
-                    double gain3 =
+                    const double gain3 =
                       distances( t5, t6 ) + distances( t7, t8 ) + distances( t9, t10 ) - distances( t6, t7 ) - distances( t8, t9 ) - distances( t10, t5 );
                     if ( gainFirstBridge + gain3 > maxGain ) {
                       maxGain = gainFirstBridge + gain3;
@@ -278,13 +276,13 @@ namespace {
       }
       if ( maxGain > tolerance ) {
         if ( !dontLook.empty() ) {
-          for ( size_t i = 0; i < bestTs.size(); ++i ) {
-            dontLook[ bestTs[ i ] ] = false;
+          for ( const auto& bi : bestTs ) {
+            dontLook[ bi ] = false;
           }
         }
         if ( !otherDontLook.empty() ) {
-          for ( size_t i = 0; i < bestTs.size(); ++i ) {
-            otherDontLook[ bestTs[ i ] ] = false;
+          for ( const auto& bi : bestTs ) {
+            otherDontLook[ bi ] = false;
           }
         }
         performKOptMove_( bestTs, incl, tour, position );
@@ -317,7 +315,7 @@ namespace {
     assert( ts.size() > 1 );
     const size_t tb = ts.back();
     vector< pair< size_t, size_t > > tcTdPairs;
-    for ( const auto tc : nearestNeighbors[ tb ] ) {
+    for ( const auto& tc : nearestNeighbors[ tb ] ) {
       const double G1 = G0 - distances( tb, tc );
       if ( G1 <= tolerance ) {
         continue;
@@ -579,6 +577,9 @@ namespace {
     bool change = false;
     bool change4 = true;
     auto innerLoop = [ k, linKernighan, &tour, &betterTour, &distances, &nearestNeighbors, &position, &dontLook ] {
+      if ( linKernighan ) {
+        return kOptOuterLoop_( k, tour, position, dontLook, betterTour, distances, nearestNeighbors, linKernighan );
+      }
       switch ( k ) {
         case 2: return twoOptInnerLoop_( tour, position, dontLook, distances, nearestNeighbors );
         case 3: return threeOptInnerLoop_( tour, position, dontLook, distances, nearestNeighbors );
@@ -669,6 +670,9 @@ namespace {
                                                           vector< bool >& dontLook,
                                                           const VDistances& distances,
                                                           const vector< vector< size_t > >& nearestNeighbors ) {
+      if ( linKernighan ) {
+        return kOptOuterLoop_( k, tour, position, dontLook, betterTour, distances, nearestNeighbors, linKernighan );
+      }
       switch ( k ) {
         case 2: return twoOptInnerLoop_( tour, position, dontLook, distances, nearestNeighbors );
         case 3: return threeOptInnerLoop_( tour, position, dontLook, distances, nearestNeighbors );
@@ -696,7 +700,7 @@ inline double VDistances::computeDistance_( const double* point1, const double* 
 {
   double dist = 0.0;
   for ( size_t i = 0; i < pointDimension; ++i ) {
-    double diff = point1[ i ] - point2[ i ];
+    const double diff = point1[ i ] - point2[ i ];
     dist += diff * diff;
   }
   return rounding_( sqrt( dist ) );
