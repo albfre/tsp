@@ -313,7 +313,7 @@ namespace {
                                             const vector< vector< size_t > >& nearestNeighbors )
   {
     assert( ts.size() > 1 );
-    const size_t tb = ts.back();
+    const auto tb = ts.back();
     vector< pair< size_t, size_t > > tcTdPairs;
     for ( const auto& tc : nearestNeighbors[ tb ] ) {
       const auto G1 = G0 - distances( tb, tc );
@@ -326,7 +326,7 @@ namespace {
         continue;
       }
       for ( const auto tdChoice : { true, false } ) {
-        const size_t td = tdChoice ? previous_( tc, tour, position ) : next_( tc, tour, position );
+        const auto td = tdChoice ? previous_( tc, tour, position ) : next_( tc, tour, position );
         if ( depth + 1 == k ) {
           const auto G2 = G1 + distances( tc, td );
           if ( G2 - distances( ts.front(), td ) <= tolerance && ( G2 <= bestG && G2 <= bestInfeasibleG ) ) {
@@ -344,10 +344,10 @@ namespace {
     }
 /*    sort( tcTdPairs.begin(), tcTdPairs.end(), [&] ( const pair< size_t, size_t >& p1,
                                                     const pair< size_t, size_t >& p2 ) {
-      const size_t tc1 = p1.first;
-      const size_t td1 = p1.second;
-      const size_t tc2 = p2.first;
-      const size_t td2 = p2.second;
+      const auto tc1 = p1.first;
+      const auto td1 = p1.second;
+      const auto tc2 = p2.first;
+      const auto td2 = p2.second;
       return distances( tc1, td1 ) - distances( tb, tc1 )
              < distances( tc2, td2 ) - distances( tb, tc2 );
     } );
@@ -355,15 +355,15 @@ namespace {
     reverse( tcTdPairs.begin(), tcTdPairs.end() );
 
     while ( !tcTdPairs.empty() ) {
-      const size_t tc = tcTdPairs.back().first;
-      const size_t td = tcTdPairs.back().second;
+      const auto tc = tcTdPairs.back().first;
+      const auto td = tcTdPairs.back().second;
       tcTdPairs.pop_back();
 
       ts.push_back( tc );
       ts.push_back( td );
       const auto G1 = G0 - distances( tb, tc );
       const auto G2 = G1 + distances( tc, td );
-      double gain = G2 - distances( ts.front(), ts.back() );
+      auto gain = G2 - distances( ts.front(), ts.back() );
       if ( gain > tolerance && makesTour_( ts, tour, position ) ) {
         return gain;
       }
@@ -431,7 +431,7 @@ namespace {
       }
       auto found = false;
       for ( const auto t2choice : { true, false } ) {
-        size_t t2 = t2choice ? previous_( t1, tour, position ) : next_( t1, tour, position );
+        const auto t2 = t2choice ? previous_( t1, tour, position ) : next_( t1, tour, position );
         if ( inBetterTour( t1, t2, betterTour ) ) {
           continue;
         }
@@ -685,96 +685,6 @@ namespace {
 
   inline double distanceRound( double d ) { return double( long( d + 0.5 ) ); }
 } // anonymous namespace
-
-// VDistances
-VDistances::VDistances( const vector< vector< double > >& points,
-                        function< double ( double ) > rounding ) :
-  rounding_( rounding )
-{
-  for ( size_t i = 1; i < points.size(); ++i ) {
-    assert( points[ i ].size() == points[ 0 ].size() );
-  }
-}
-inline bool VDistances::empty() const { return size() == 0; }
-
-inline double VDistances::computeDistance_( const double* point1, const double* point2, size_t pointDimension ) const
-{
-  double dist = 0.0;
-  for ( size_t i = 0; i < pointDimension; ++i ) {
-    const auto diff = point1[ i ] - point2[ i ];
-    dist += diff * diff;
-  }
-  return rounding_( sqrt( dist ) );
-}
-
-inline double VDistances::computeDistance_( const vector< double >& point1, const vector< double >& point2 ) const
-{
-  return computeDistance_( &point1[ 0 ], &point2[ 0 ], point1.size() );
-}
-
-// MatrixDistances
-MatrixDistances::MatrixDistances( const vector< vector< double > >& points,
-                                  function< double ( double ) > rounding ) :
-  VDistances( points, rounding ),
-  size_( points.size() ),
-  distances_( size_ * size_, 0.0 )
-{
-  for ( size_t i = 0; i < size_; ++i ) {
-    const size_t iSize = i * size_;
-    for ( size_t j = 0; j < size_; ++j ) {
-      distances_[ iSize + j ] = computeDistance_( points[ i ], points[ j ] );
-    }
-  }
-}
-inline double MatrixDistances::operator()( size_t i, size_t j ) const { return distances_[ i * size_ + j ]; }
-inline size_t MatrixDistances::size() const { return size_; }
-void MatrixDistances::setMatrix( vector< vector< double > >& distances )
-{
-  for ( size_t i = 0; i < distances.size(); ++i ) {
-    assert( distances[ i ].size() == distances.size() );
-    assert( distances[ i ][ i ] == 0.0 );
-    for ( size_t j = i + 1; j < distances[ i ].size(); ++j ) {
-      assert( fabs( distances[ i ][ j ] - distances[ j ][ i ] ) < 1e-9 );
-      assert( distances[ i ][ j ] >= 0.0 );
-    }
-  }
-  size_ = distances.size();
-  distances_.resize( size_ * size_ );
-  for ( size_t i = 0; i < size_; ++i ) {
-    const size_t iSize = i * size_;
-    for ( size_t j = 0; j < size_; ++j ) {
-      distances_[ iSize + j ] = distances[ i ][ j ];
-    }
-  }
-}
-
-// MatrixRoundedDistances
-MatrixRoundedDistances::MatrixRoundedDistances( const vector< vector< double > >& points ) :
-  MatrixDistances( points, [] ( double d ) { return distanceRound( d ); } )
-{}
-
-// OnTheFlyDistances
-OnTheFlyDistances::OnTheFlyDistances( const vector< vector< double > >& points,
-                                      function< double ( double ) > rounding ) :
-  VDistances( points, rounding ),
-  size_( points.size() ),
-  pointDimension_( points.empty() ? 0 : points[ 0 ].size() ),
-  points_( size_ * pointDimension_, 0.0 )
-{
-  for ( size_t i = 0; i < points.size(); ++i ) {
-    assert( points[ i ].size() == pointDimension_ );
-    for ( size_t j = 0; j < pointDimension_; ++j ) {
-      points_[ i * pointDimension_ + j ] = points[ i ][ j ];
-    }
-  }
-}
-inline double OnTheFlyDistances::operator()( size_t i, size_t j ) const { return computeDistance_( &points_[ i * pointDimension_ ], &points_[ j * pointDimension_ ], pointDimension_ ); }
-inline size_t OnTheFlyDistances::size() const { return size_; }
-
-// OnTheFlyRoundedDistances
-OnTheFlyRoundedDistances::OnTheFlyRoundedDistances( const vector< vector< double > >& points ) :
-  OnTheFlyDistances( points, [] ( double d ) { return distanceRound( d ); } )
-{}
 
 vector< size_t > INLINE_ATTRIBUTE TravelingSalespersonProblemSolver::computeTour( const VDistances& distances )
 {

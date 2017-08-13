@@ -1,8 +1,8 @@
 CC = g++
 CFLAGS = -g -funroll-loops -std=gnu++14 -O2 -Wall -pedantic
 FILE = TravelingSalespersonProblemSolver
-SRCS = $(FILE).cpp $(FILE).h
-OBJS = $(FILE).o
+SRCS = $(FILE).cpp $(FILE).h Distances.cpp Distances.h
+OBJS = $(FILE).o Distances.o
 TEST = TestTSP
 TESTSRC = $(TEST).cpp
 PROFILECFLAGS = -pg -funroll-loops -std=gnu++11 -O2 -Wall -pedantic

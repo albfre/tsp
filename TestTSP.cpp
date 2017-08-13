@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "TravelingSalespersonProblemSolver.h"
+#include "Distances.h"
 
 using namespace std;
 using namespace TravelingSalespersonProblemSolver;
