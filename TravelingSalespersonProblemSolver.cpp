@@ -28,8 +28,8 @@ using namespace std;
 using namespace TravelingSalespersonProblemSolver;
 
 namespace {
-  const bool useInfeasibleMoves = true;
-  const size_t maxGainMoves = 1000;
+  const auto useInfeasibleMoves = true;
+  const auto maxGainMoves = static_cast< size_t >( 1000 );
 
   bool INLINE_ATTRIBUTE twoOptInnerLoop_( vector< size_t >& tour,
                                           vector< size_t >& position,
@@ -39,14 +39,14 @@ namespace {
   {
     updatePosition( tour, position );
 
-    bool changed = false;
+    auto changed = false;
     vector< size_t > bestTs;
     for ( size_t t1 = 0; t1 < tour.size(); ++t1 ) {
       if ( !dontLook.empty() && dontLook[ t1 ] ) {
         continue;
       }
-      bool found = false;
-      double maxGain = 0.0;
+      auto found = false;
+      auto maxGain = 0.0;
       for ( const auto t2choice : { true, false } ) {
         const auto t2 = t2choice ? previous_( t1, tour, position ) : next_( t1, tour, position );
         for ( const auto& t3 : nearestNeighbors[ t2 ] ) {
@@ -57,7 +57,7 @@ namespace {
             continue;
           }
           const auto t4 = t2choice ? next_( t3, tour, position ) : previous_( t3, tour, position );
-          const double gain = distances( t1, t2 ) + distances( t3, t4 ) - distances( t1, t4 ) - distances( t2, t3 );
+          const auto gain = distances( t1, t2 ) + distances( t3, t4 ) - distances( t1, t4 ) - distances( t2, t3 );
           if ( gain > maxGain ) {
             maxGain = gain;
             bestTs = { t1, t2, t3, t4 };
@@ -88,22 +88,22 @@ namespace {
                                             const VDistances& distances,
                                             const vector< vector< size_t > >& nearestNeighbors )
   {
-    bool changed = false;
+    auto changed = false;
     updatePosition( tour, position );
     vector< size_t > bestTs;
     for ( size_t t1 = 0; t1 < tour.size(); ++t1 ) {
       if ( !dontLook.empty() && dontLook[ t1 ] ) {
         continue;
       }
-      bool found = false;
-      double G = 0.0;
+      auto found = false;
+      auto G = 0.0;
       for ( const auto t2choice : { true, false } ) {
         const auto t2 = t2choice ? previous_( t1, tour, position ) : next_( t1, tour, position );
         for ( const auto& t3 : nearestNeighbors[ t2 ] ) {
           if ( t3 == previous_( t2, tour, position ) || t3 == next_( t2, tour, position ) ) {
             continue;
           }
-          const double g1 = distances( t1, t2 ) - distances( t2, t3 );
+          const auto g1 = distances( t1, t2 ) - distances( t2, t3 );
           if ( g1 <= tolerance ) {
             continue;
           }
@@ -114,7 +114,7 @@ namespace {
           }
           {
             // Test for improving 2-opt move
-            const double gain = g1 + distances( t3, t4 ) - distances( t4, t1 );
+            const auto gain = g1 + distances( t3, t4 ) - distances( t4, t1 );
             if ( gain > G ) {
               G = gain;
               bestTs = { t1, t2, t3, t4 };
@@ -124,7 +124,7 @@ namespace {
             if ( t5 == previous_( t4, tour, position ) || t5 == next_( t4, tour, position ) ) {
               continue;
             }
-            const double g2 = distances( t3, t4 ) - distances( t4, t5 );
+            const auto g2 = distances( t3, t4 ) - distances( t4, t5 );
             if ( g1 + g2 <= tolerance ) {
               continue;
             }
@@ -134,8 +134,8 @@ namespace {
             if ( t6 == t1 ) {
               continue;
             }
-            const double g3 = distances( t5, t6 ) - distances( t6, t1 );
-            const double gain = g1 + g2 + g3;
+            const auto g3 = distances( t5, t6 ) - distances( t6, t1 );
+            const auto gain = g1 + g2 + g3;
             if ( gain > G ) {
               G = gain;
               bestTs = { t1, t2, t3, t4, t5, t6 };
@@ -152,18 +152,18 @@ namespace {
                  ( !t2choice && !between_( t2, t3, t5, position ) ) ) {
               continue;
             }
-            const double g2 = distances( t3, t4 ) - distances( t4, t5 );
+            const auto g2 = distances( t3, t4 ) - distances( t4, t5 );
             if ( g1 + g2 <= tolerance ) {
-              ;
+              continue;
             }
             // Only consider one choice of t6. The other choice is possible, but clutters the code and doesn't lead to a significant improvement.
-            const bool t6choice = t2choice;
+            const auto t6choice = t2choice;
             const auto t6 = t6choice ? next_( t5, tour, position ) : previous_( t5, tour, position );
             if ( t6 == t3 || t6 == t2 || t6 == t1 ) {
               continue;
             }
-            const double g3 = distances( t5, t6 ) - distances( t6, t1 );
-            const double gain = g1 + g2 + g3;
+            const auto g3 = distances( t5, t6 ) - distances( t6, t1 );
+            const auto gain = g1 + g2 + g3;
             if ( gain > G ) {
               G = gain;
               bestTs = { t3, t4, t5, t6, t1, t2 };
@@ -199,14 +199,14 @@ namespace {
     // Performs infeasible 2-opt moves followed by a 2- or 3-opt move.
     // Includes double bridge moves.
     updatePosition( tour, position );
-    bool changed = false;
+    auto changed = false;
     vector< size_t > bestTs;
     for ( size_t t1 = 0; t1 < tour.size(); ++t1 ) {
       if ( !dontLook.empty() && dontLook[ t1 ] ) {
         continue;
       }
-      bool found = false;
-      double maxGain = 0.0;
+      auto found = false;
+      auto maxGain = 0.0;
       vector< size_t > incl;
       for ( const auto t2choice : { true } ) {
         const auto t2 = t2choice ? next_( t1, tour, position ) : previous_( t1, tour, position );
@@ -215,14 +215,14 @@ namespace {
           if ( t3 == t1 || t4 == t1 ) {
             continue;
           }
-          const double gainFirstBridge = distances( t1, t2 ) + distances( t3, t4 ) - distances( t2, t3 ) - distances( t1, t4 );
+          const auto gainFirstBridge = distances( t1, t2 ) + distances( t3, t4 ) - distances( t2, t3 ) - distances( t1, t4 );
           if ( gainFirstBridge <= tolerance ) {
             continue;
           }
 
           for ( size_t t5 = t2; t5 != t3; t5 = t2choice == 0 ? next_( t5, tour, position ) : previous_( t5, tour, position ) ) {
-            for ( auto t6choice = 0; t6choice < 1; ++t6choice ) {
-              auto t6 = t6choice == 0 ? next_( t5, tour, position ) : previous_( t5, tour, position );
+            for ( const auto t6choice : { true, false } ) {
+              auto t6 = t6choice ? next_( t5, tour, position ) : previous_( t5, tour, position );
               if ( t5 == t2 && t6 == t1 ) {
                 continue;
               }
@@ -232,7 +232,7 @@ namespace {
                   if ( !between_( t4, t1, t7, position ) || !between_( t4, t1, t8, position ) ) {
                     continue;
                   }
-                  const double gain2 =
+                  const auto gain2 =
                     t8choice == t6choice ? distances( t5, t6 ) + distances( t7, t8 ) - distances( t6, t7 ) - distances( t5, t8 )
                                          : distances( t5, t6 ) + distances( t7, t8 ) - distances( t5, t7 ) - distances( t6, t8 );
                   if ( gainFirstBridge + gain2 > maxGain ) {
@@ -260,7 +260,7 @@ namespace {
                       continue;
                     }
 
-                    const double gain3 =
+                    const auto gain3 =
                       distances( t5, t6 ) + distances( t7, t8 ) + distances( t9, t10 ) - distances( t6, t7 ) - distances( t8, t9 ) - distances( t10, t5 );
                     if ( gainFirstBridge + gain3 > maxGain ) {
                       maxGain = gainFirstBridge + gain3;
@@ -316,7 +316,7 @@ namespace {
     const size_t tb = ts.back();
     vector< pair< size_t, size_t > > tcTdPairs;
     for ( const auto& tc : nearestNeighbors[ tb ] ) {
-      const double G1 = G0 - distances( tb, tc );
+      const auto G1 = G0 - distances( tb, tc );
       if ( G1 <= tolerance ) {
         continue;
       }
@@ -325,10 +325,10 @@ namespace {
         // The added edge should not belong to T
         continue;
       }
-      for ( const bool tdChoice : { true, false } ) {
+      for ( const auto tdChoice : { true, false } ) {
         const size_t td = tdChoice ? previous_( tc, tour, position ) : next_( tc, tour, position );
         if ( depth + 1 == k ) {
-          const double G2 = G1 + distances( tc, td );
+          const auto G2 = G1 + distances( tc, td );
           if ( G2 - distances( ts.front(), td ) <= tolerance && ( G2 <= bestG && G2 <= bestInfeasibleG ) ) {
             continue;
           }
@@ -361,8 +361,8 @@ namespace {
 
       ts.push_back( tc );
       ts.push_back( td );
-      const double G1 = G0 - distances( tb, tc );
-      const double G2 = G1 + distances( tc, td );
+      const auto G1 = G0 - distances( tb, tc );
+      const auto G2 = G1 + distances( tc, td );
       double gain = G2 - distances( ts.front(), ts.back() );
       if ( gain > tolerance && makesTour_( ts, tour, position ) ) {
         return gain;
@@ -417,7 +417,7 @@ namespace {
                                         bool linKernighan )
   {
     updatePosition( tour, position );
-    bool anyChange = false;
+    auto anyChange = false;
     vector< size_t > ts;
     vector< pair< size_t, size_t > > added;
     vector< pair< size_t, size_t > > removed;
@@ -429,9 +429,9 @@ namespace {
       if ( dontLook[ t1 ] ) {
         continue;
       }
-      bool found = false;
-      for ( size_t t2choice = 0; t2choice < 2; ++t2choice ) {
-        size_t t2 = t2choice == 0 ? previous_( t1, tour, position ) : next_( t1, tour, position );
+      auto found = false;
+      for ( const auto t2choice : { true, false } ) {
+        size_t t2 = t2choice ? previous_( t1, tour, position ) : next_( t1, tour, position );
         if ( inBetterTour( t1, t2, betterTour ) ) {
           continue;
         }
@@ -443,34 +443,34 @@ namespace {
         bestInfeasibleTs.clear();
         tourCopy = tour;
         tsHistory.clear();
-        double G0 = distances( t1, t2 );
-        double bestG = tolerance;
-        double bestInfeasibleG = tolerance;
-        bool testChange = false;
+        auto G0 = distances( t1, t2 );
+        auto bestG = tolerance;
+        auto bestInfeasibleG = tolerance;
+        auto testChange = false;
         size_t lkDepth = 0;
         do {
           ++lkDepth;
           bestG = tolerance;
           bestInfeasibleG = useInfeasibleMoves ? tolerance : numeric_limits< double >::max();
-          double gain = getBestKOptMove_( 1,
-                                          k,
-                                          ts,
-                                          G0,
-                                          added,
-                                          removed,
-                                          bestTs,
-                                          bestG,
-                                          bestInfeasibleTs,
-                                          bestInfeasibleG,
-                                          tour,
-                                          position,
-                                          distances,
-                                          nearestNeighbors );
+          auto gain = getBestKOptMove_( 1,
+                                        k,
+                                        ts,
+                                        G0,
+                                        added,
+                                        removed,
+                                        bestTs,
+                                        bestG,
+                                        bestInfeasibleTs,
+                                        bestInfeasibleG,
+                                        tour,
+                                        position,
+                                        distances,
+                                        nearestNeighbors );
           if ( gain > tolerance ) {
             performKOptMove_( ts, tour, position );
             assert( isTour_( tour, position ) );
             tsHistory.insert( tsHistory.end(), ts.begin(), ts.end() );
-            for ( size_t th : tsHistory ) {
+            for ( const auto& th : tsHistory ) {
               dontLook[ th ] = false;
             }
             found = true;
@@ -541,14 +541,14 @@ namespace {
         swapEdges.push_back( i );
       }
     }
-    sort( swapEdges.begin(), swapEdges.end(), [&] ( const size_t ta, const size_t tb ) { return position[ ta ] < position[ tb ]; } );
+    sort( swapEdges.begin(), swapEdges.end(), [&] ( const auto& ta, const auto& tb ) { return position[ ta ] < position[ tb ]; } );
     vector< size_t > ts;
     ts.reserve( 2 * swapEdges.size() );
     for ( size_t i = 0; i < swapEdges.size(); ++i ) {
       ts.push_back( swapEdges[ i ] );
       ts.push_back( next_( ts.back(), tour, position ) );
     }
-    vector< size_t > tourCopy( tour );
+    auto tourCopy = tour;
     size_t index = 0;
     for ( size_t i = 0; i + 1 < ts.size(); i += 2 ) {
       for ( size_t t = ts[ i ]; t != ( i == 0 ? ts.back() : ts[ i - 1 ] ); t = previous_( t, tourCopy, position ), ++index ) {
@@ -616,15 +616,16 @@ namespace {
                                               const vector< vector< size_t > >& nearestNeighbors )
   {
     assert( tour.size() > 8 );
-    bool change = false;
+    auto change = false;
     vector< bool > dontLook( tour.size(), false );
     vector< size_t > position( tour.size() );
-    vector< size_t > bestTour( tour );
-    double bestLength = getLength_( tour, distances );
-    vector< size_t > tour1( tour ), tour2( tour );
-    vector< vector< size_t > > nn( nearestNeighbors );
+    auto bestTour = tour;
+    auto bestLength = getLength_( tour, distances );
+    auto tour1 = tour;
+    auto tour2 = tour;
+    auto nn = nearestNeighbors;
     for ( size_t i = 0; i < iterations; ++i ) {
-      bool change4 = true;
+      auto change4 = true;
       while ( change4 ) {
         change4 = false;
         while ( improveTour( tour, position, dontLook, distances, nn ) ) {
@@ -639,7 +640,7 @@ namespace {
           }
         }
       }
-      double length = getLength_( tour, distances );
+      const auto length = getLength_( tour, distances );
       if ( length < bestLength ) {
         bestTour = tour;
         bestLength = length;
@@ -700,7 +701,7 @@ inline double VDistances::computeDistance_( const double* point1, const double* 
 {
   double dist = 0.0;
   for ( size_t i = 0; i < pointDimension; ++i ) {
-    const double diff = point1[ i ] - point2[ i ];
+    const auto diff = point1[ i ] - point2[ i ];
     dist += diff * diff;
   }
   return rounding_( sqrt( dist ) );

@@ -1,5 +1,5 @@
 CC = g++
-CFLAGS = -g -funroll-loops -std=gnu++11 -O2 -Wall -pedantic
+CFLAGS = -g -funroll-loops -std=gnu++14 -O2 -Wall -pedantic
 FILE = TravelingSalespersonProblemSolver
 SRCS = $(FILE).cpp $(FILE).h
 OBJS = $(FILE).o
