@@ -3,7 +3,9 @@
 
 #include "HelperFunctions.h"
 
+// For a description of the following, see K. Helsgaun, General k-opt submoves for the Lin-Kernighan TSP heuristic.  Mathematical Programming Computation, 2009
 namespace TravelingSalespersonProblemSolver {
+  // Sets up the vectors p, q, and incl needed to perform moves
   void getPQI_( std::vector< size_t >& p,
                 std::vector< size_t >& q,
                 std::vector< size_t >& incl,
@@ -43,6 +45,7 @@ namespace TravelingSalespersonProblemSolver {
     }
   }
 
+  // Perform the k-opt move defined by the edge switches ts using the helper vectors incl, p, and q
   void performKOptMove_( const std::vector< size_t >& ts,
                          const std::vector< size_t >& incl,
                          const std::vector< size_t >& p,
@@ -110,7 +113,6 @@ namespace TravelingSalespersonProblemSolver {
     for ( size_t i = ts.size(); ( i = ( q[ incl[ p[ i - 1 ] ] ] + 1 ) ^ 1 ) != 0; ++count );
     return 2 * count == ts.size();
   }
-
 }
 
 #endif // PERFORM_HELSGAUN_MOVE_H

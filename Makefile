@@ -1,11 +1,16 @@
 CC = g++
 CFLAGS = -g -funroll-loops -std=gnu++14 -O2 -Wall -pedantic
-FILE = TravelingSalespersonProblemSolver
-SRCS = $(FILE).cpp $(FILE).h Distances.cpp Distances.h
-OBJS = $(FILE).o Distances.o
+SRCS = \
+       TravelingSalespersonProblemSolver.cpp \
+       TravelingSalespersonProblemSolver.h \
+       Distances.cpp \
+       Distances.h \
+
+OBJS = TravelingSalespersonProblemSolver.o Distances.o
 TEST = TestTSP
-TESTSRC = $(TEST).cpp
-PROFILECFLAGS = -pg -funroll-loops -std=gnu++11 -O2 -Wall -pedantic
+TESTSRC = TestTSP.cpp
+
+TravelingSalespersonProblemSolver.cpp : InitialTours.h HelperFunctions.h NeighborAlgorithms.h PerformHelsgaunMove.h
 
 all: product test
 
@@ -14,14 +19,6 @@ product: $(SRCS) \
 
 test: $(TESTSRC) \
 ; $(CC) $(CFLAGS) -o $(TEST) $(TESTSRC) $(OBJS)
-
-profile: productprofile testprofile
-
-productprofile: $(SRCS) \
-; $(CC) $(PROFILECFLAGS) -c $(SRCS)
-
-testprofile: $(TESTSRC) \
-; $(CC) $(PROFILECFLAGS) -o $(TEST) $(TESTSRC) $(OBJS)
 
 clean: \
 ; $(RM) $(OBJS)
