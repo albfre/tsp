@@ -2,13 +2,13 @@
 #include <algorithm>
 #include <assert.h>
 #include <cmath>
-#include <cstdlib>
 #include <ctime>
 #include <numeric>
 #include <iostream>
 #include <iomanip>
-#include <limits>
 #include <set>
+#include <random>
+#include <functional>
 
 /* HEADER */
 #include "TravelingSalespersonProblemSolver.h"
@@ -28,7 +28,8 @@ using namespace std;
 using namespace TravelingSalespersonProblemSolver;
 
 namespace {
-  const auto useInfeasibleMoves = true;
+  const auto maxNumOfInfeasibleMoves = static_cast< size_t >( 1 );
+  const auto useInfeasibleMoves = maxNumOfInfeasibleMoves > 0;
   const auto maxGainMoves = static_cast< size_t >( 1000 );
 
   // The basic 2-opt and 3-opt algorithms, which consider all 2/3-opt moves and take the best ones
@@ -464,7 +465,7 @@ namespace {
               added.push_back( make_pair( ts[ i + 1 ], ts[ i ] ) );
             }
           }
-        } while ( ( bestG > tolerance && lkDepth < maxGainMoves ) || ( bestInfeasibleG > tolerance && ts.size() < 2 * k + 1 ) );
+        } while ( ( bestG > tolerance && lkDepth < maxGainMoves ) || ( bestInfeasibleG > tolerance && ts.size() < maxNumOfInfeasibleMoves * 2 * k + 1 ) );
         if ( testChange ) {
           swap( tour, tourCopy );
           updatePosition( tour, position );
@@ -478,17 +479,19 @@ namespace {
   }
 
   // Perturb the current tour by swapping edges
-  void kSwapKick( size_t k,
+  void kSwapKick( size_t numOfPairs,
                   vector< size_t >& tour,
                   vector< size_t >& position,
-                  vector< bool >& dontLook )
+                  vector< bool >& dontLook,
+                  std::function<int()> random )
   {
+    assert( numOfPairs > 0 );
     updatePosition( tour, position );
 
     vector< size_t > swapEdges;
-    swapEdges.reserve( k );
-    while ( swapEdges.size() < k && swapEdges.size() < tour.size() / 2 ) {
-      size_t i = rand() % tour.size();
+    swapEdges.reserve( 2 * numOfPairs );
+    while ( swapEdges.size() < 2 * numOfPairs && swapEdges.size() < 2 * ( tour.size() / 4 ) ) {
+      size_t i = random() % tour.size();
       if ( find( swapEdges.begin(), swapEdges.end(), i ) == swapEdges.end() ) {
         swapEdges.push_back( i );
       }
@@ -524,7 +527,8 @@ namespace {
                                                   vector< size_t >& tour,
                                                   vector< size_t >& betterTour,
                                                   const VDistances& distances,
-                                                  const vector< vector< size_t > >& nearestNeighbors )
+                                                  const vector< vector< size_t > >& nearestNeighbors,
+                                                  std::function<int()> random )
   {
     auto improveTour = [ k, linKernighan, &betterTour ] ( vector< size_t >& tour,
                                                           vector< size_t >& position,
@@ -577,7 +581,7 @@ namespace {
 
       tour = bestTour;
       if ( i + 1 < iterations ) {
-        kSwapKick( 6, tour, position, dontLook );
+        kSwapKick( min( tour.size() / 4, static_cast< size_t >( ( random() ) % 16 ) ) + 1, tour, position, dontLook, random );
       }
     }
     return change;
@@ -589,7 +593,8 @@ namespace {
                                           vector< size_t >& tour,
                                           vector< size_t >& betterTour,
                                           const VDistances& distances,
-                                          const vector< vector< size_t > >& nearestNeighbors )
+                                          const vector< vector< size_t > >& nearestNeighbors,
+                                          std::function<int()> random )
   {
     const size_t numberOfIterations = 1;
     const auto useGain23 = k > 3;
@@ -600,7 +605,8 @@ namespace {
                                      tour,
                                      betterTour,
                                      distances,
-                                     nearestNeighbors );
+                                     nearestNeighbors,
+                                     random );
   }
 
 
@@ -624,13 +630,19 @@ vector< size_t > INLINE_ATTRIBUTE TravelingSalespersonProblemSolver::computeTour
     double timeSanity( ( clock() - start ) / CLOCKS_PER_SEC );
     cerr << "DONE: " << timeSanity << endl;
   }
+
+  std::mt19937 generator( 1338 );
+  std::uniform_int_distribution<> uniformDist( 0, distances.size() - 1 );
+  auto random = std::bind( uniformDist, std::ref( generator ) );
+
   double start( clock() );
-  const vector< size_t > tourRand = getRandomTour_( distances );
+  const vector< size_t > tourRand = getRandomTour_( distances, random );
   double timeRand( ( clock() - start ) / CLOCKS_PER_SEC );
   start = clock();
-  const vector< size_t > tourNN = getNearestNeighborTour_( distances );
+  const vector< size_t > tourNN = getNearestNeighborTour_( distances, random );
   double timeNN( ( clock() - start ) / CLOCKS_PER_SEC );
   cerr << setprecision( 8 );
+
 
   vector< vector< size_t > > nearestNeighbors5( distances.size() );
   vector< vector< size_t > > nearestNeighbors30( distances.size() );
@@ -646,8 +658,8 @@ vector< size_t > INLINE_ATTRIBUTE TravelingSalespersonProblemSolver::computeTour
     double timeHelsgaun( ( clock() - start ) / CLOCKS_PER_SEC );
     start = clock();
     for ( size_t i = 0; i < distances.size(); ++i ) {
-      nearestNeighbors5[ i ] = vector< size_t >( nearestNeighbors30[ i ].begin(), nearestNeighbors30[ i ].begin() + min( size_t( 5 ), nearestNeighbors30[ i ].size() ) );
-      helsgaun5[ i ] = vector< size_t >( helsgaun10[ i ].begin(), helsgaun10[ i ].begin() + min( size_t( 5 ), helsgaun10[ i ].size() ) );
+      nearestNeighbors5[ i ] = vector< size_t >( nearestNeighbors30[ i ].begin(), nearestNeighbors30[ i ].begin() + min( static_cast< size_t >( 5 ), nearestNeighbors30[ i ].size() ) );
+      helsgaun5[ i ] = vector< size_t >( helsgaun10[ i ].begin(), helsgaun10[ i ].begin() + min( static_cast< size_t >( 5 ), helsgaun10[ i ].size() ) );
     }
     auto addVector = [&] ( vector< vector< size_t > >& nn, const vector< vector< size_t > >& hn ) {
       assert( nn.size() == hn.size() );
@@ -692,7 +704,7 @@ vector< size_t > INLINE_ATTRIBUTE TravelingSalespersonProblemSolver::computeTour
     vector< size_t > betterTour;
     bool linKernighan = false;
     double start( clock() );
-    improveTourKOpt_( k, linKernighan, tour, betterTour, distances, nearestNeighbors30 );
+    improveTourKOpt_( k, linKernighan, tour, betterTour, distances, nearestNeighbors30, random );
     double time( ( clock() - start ) / CLOCKS_PER_SEC );
     cerr << k << "-opt tour distance: " << getLength_( tour, distances ) << ", time: " << time << endl;
     assert( isTour_( tour, distances ) );
@@ -703,7 +715,7 @@ vector< size_t > INLINE_ATTRIBUTE TravelingSalespersonProblemSolver::computeTour
     vector< size_t > betterTour;
     bool linKernighan = false;
     double start( clock() );
-    improveTourIteratedKOpt_( k, linKernighan, 1000, false, tour, betterTour, distances, nearestNeighbors30 );
+    improveTourIteratedKOpt_( k, linKernighan, 1000, false, tour, betterTour, distances, nearestNeighbors30, random );
     double time( ( clock() - start ) / CLOCKS_PER_SEC );
     cerr << "I" << k << "    tour distance: " << getLength_( tour, distances ) << ", time: " << time << endl;
   }
@@ -718,9 +730,9 @@ vector< size_t > INLINE_ATTRIBUTE TravelingSalespersonProblemSolver::computeTour
     vector< vector< double > > points;
     double start( clock() );
     for ( size_t i = 0; i < 10; ++i ) {
-      tour = getHelsgaunInitialTour_( nn, helsgaun10, helsgaunDistances10, bestTour );
+      tour = getHelsgaunInitialTour_( nn, helsgaun10, helsgaunDistances10, bestTour, random );
       bool useGain23 = true;
-      while ( improveTourKOpt_( k, useGain23, tour, betterTour, distances, nn ) ) {
+      while ( improveTourKOpt_( k, useGain23, tour, betterTour, distances, nn, random ) ) {
         updateNearest( tour, tour1, tour2, nn );
       }
       if ( getLength_( tour, distances ) < getLength_( bestTour, distances ) ) {
@@ -740,7 +752,7 @@ vector< size_t > INLINE_ATTRIBUTE TravelingSalespersonProblemSolver::computeTour
     bool linKernighan = true;
     bool useGain23 = false;
     double start( clock() );
-    improveTourIteratedKOpt_( k, linKernighan, 100, useGain23, tour, betterTour, distances, nearestNeighbors5 );
+    improveTourIteratedKOpt_( k, linKernighan, 100, useGain23, tour, betterTour, distances, nearestNeighbors5, random );
     double time( ( clock() - start ) / CLOCKS_PER_SEC );
     cerr << k << "-ILK tour distance: " << getLength_( tour, distances ) << ", time: " << time << endl;
   }

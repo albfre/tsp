@@ -5,7 +5,7 @@
 
 namespace TravelingSalespersonProblemSolver {
 
-  std::vector< size_t > getRandomTour_( const VDistances& distances )
+  std::vector< size_t > getRandomTour_( const VDistances& distances, std::function<int()> random )
   {
     std::vector< size_t > tour( distances.size() );
     for ( size_t i = 0; i < distances.size(); ++i ) {
@@ -13,18 +13,18 @@ namespace TravelingSalespersonProblemSolver {
     }
 
     for ( size_t i = 0; i < distances.size(); ++i ) {
-      size_t ind1 = rand() % distances.size();
-      size_t ind2 = rand() % distances.size();
+      size_t ind1 = random() % distances.size();
+      size_t ind2 = random() % distances.size();
       std::swap( tour[ ind1 ], tour[ ind2 ] );
     }
     return tour;
   }
 
-  std::vector< size_t > getNearestNeighborTour_( const VDistances& distances )
+  std::vector< size_t > getNearestNeighborTour_( const VDistances& distances, std::function<int()> random  )
   {
     std::vector< size_t > tour;
     tour.reserve( distances.size() );
-    size_t startNode = rand() % distances.size();
+    size_t startNode = random() % distances.size();
     tour.push_back( startNode );
     std::vector< bool > usedNodes( distances.size(), false );
     usedNodes[  startNode ] = true;
@@ -124,11 +124,12 @@ namespace TravelingSalespersonProblemSolver {
   std::vector< size_t > getHelsgaunInitialTour_( const std::vector< std::vector< size_t > >& nearestNeighbors,
                                                  const std::vector< std::vector< size_t > >& helsgaunNeighbors,
                                                  const std::vector< std::vector< double > >& helsgaunDistances,
-                                                 const std::vector< size_t >& bestTour )
+                                                 const std::vector< size_t >& bestTour,
+                                                 std::function<int()> random )
   {
     assert( helsgaunNeighbors.size() == helsgaunDistances.size() );
     assert( bestTour.size() == nearestNeighbors.size() );
-    std::vector< size_t > tour( 1, rand() % nearestNeighbors.size() );
+    std::vector< size_t > tour( 1, random() % nearestNeighbors.size() );
     size_t current = tour.front();
     std::vector< bool > added( nearestNeighbors.size(), false );
     added[ current ] = true;
