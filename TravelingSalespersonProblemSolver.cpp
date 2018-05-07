@@ -63,13 +63,11 @@ namespace {
           }
           // First choice of t4
           auto t4 = t2choice ? next_( t3, tour, position ) : previous_( t3, tour, position );
-          {
-            // Test for improving 2-opt move
-            const auto gain = g1 + distances( t3, t4 ) - distances( t4, t1 );
-            if ( gain > maxGain ) {
-              maxGain = gain;
-              bestTs = { t1, t2, t3, t4 };
-            }
+          // Test for improving 2-opt move
+          const auto gain = g1 + distances( t3, t4 ) - distances( t4, t1 );
+          if ( gain > maxGain ) {
+            maxGain = gain;
+            bestTs = { t1, t2, t3, t4 };
           }
           if ( only2Opt ) {
             continue;
@@ -514,8 +512,8 @@ namespace {
     }
     assert( index == tour.size() );
 
-    for ( size_t i = 0; i < ts.size(); ++i ) {
-      dontLook[ ts[ i ] ] = false;
+    for ( const auto& i : ts ) {
+      dontLook[ i ] = false;
     }
   }
 

@@ -1,0 +1,19 @@
+An implementation of the Lin-Kernighan-Helsgaun-2 heuristic for solving the traveling salesperson problem. In addition, conventional implementations of (iterated) 2-opt, 3-opt, and general k-opt heuristics are included.
+
+To make, run
+$ make all
+
+To test on an instance with x random points, run
+$ ./TestTSP x
+
+To test on a regular instance with x random points and about x/2 points randomly removed, run
+$ ./TestTSP 0 x
+
+To test on standard problem pcb1173 (optimal value 56892), run
+$ ./TestTSP 1 1
+
+To test on a clustered instance with about x points, run
+$ ./TestTSP 2 x
+
+To test on standard instance x in the library of test problems, run
+$ ./TestTSP 3 x

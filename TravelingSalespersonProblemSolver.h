@@ -1,9 +1,6 @@
 #ifndef TRAVELING_SALESPERSON_PROBLEM_SOLVER_H
 #define TRAVELING_SALESPERSON_PROBLEM_SOLVER_H
 
-#include <cstddef>
-#include <vector>
-#include <functional>
 #include "Distances.h"
 
 namespace TravelingSalespersonProblemSolver {
