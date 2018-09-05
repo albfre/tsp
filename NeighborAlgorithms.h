@@ -2,7 +2,6 @@
 #define NEIGHBOR_ALGORITHMS_H
 
 namespace TravelingSalespersonProblemSolver {
-
   // Updates the nearest neighbor matrix on the basis of two previous tours
   void updateNearest( const std::vector< size_t >& tour,
                       std::vector< size_t >& tour1,
@@ -45,28 +44,28 @@ namespace TravelingSalespersonProblemSolver {
     numberOfNeighbors = std::min( numberOfNeighbors, distances.size() - 1 );
     assert( numberOfNeighbors > 0 );
     std::vector< std::vector< size_t > > nearestNeighbors( distances.size(), std::vector< size_t >( numberOfNeighbors ) );
-    std::set< std::pair< double, size_t > > tmpNeighbors;
+    std::vector< std::pair< double, size_t > > neighborsHeap;
+
     for ( size_t i = 0; i < distances.size(); ++i ) {
-      tmpNeighbors.clear();
+      neighborsHeap.clear();
       double worstNearNeighbor = std::numeric_limits< double >::max();
       for ( size_t j = 0; j < distances.size(); ++j ) {
-        if ( j != i ) {
-          if ( tmpNeighbors.size() < numberOfNeighbors || distances( i, j ) < worstNearNeighbor ) {
-            if ( tmpNeighbors.size() >= numberOfNeighbors ) {
-              auto itLast = tmpNeighbors.end();
-              --itLast;
-              tmpNeighbors.erase( itLast );
-            }
-            tmpNeighbors.insert( std::make_pair( distances( i, j ), j ) );
-            worstNearNeighbor = tmpNeighbors.rbegin()->first;
+        if ( j == i ) {
+          continue;
+        }
+        if ( neighborsHeap.size() < numberOfNeighbors || distances( i, j ) < worstNearNeighbor ) {
+          if ( neighborsHeap.size() >= numberOfNeighbors ) {
+            std::pop_heap( neighborsHeap.begin(), neighborsHeap.end() );
+            neighborsHeap.pop_back();
           }
+          neighborsHeap.push_back( { distances( i, j ), j } );
+          std::push_heap( neighborsHeap.begin(), neighborsHeap.end() );
+          worstNearNeighbor = neighborsHeap.front().first;
         }
       }
-      assert( tmpNeighbors.size() == numberOfNeighbors );
-      auto it = tmpNeighbors.begin();
-      for ( size_t j = 0; j < numberOfNeighbors; ++j, ++it ) {
-        nearestNeighbors[ i ][ j ] = it->second;
-      }
+      assert( neighborsHeap.size() == numberOfNeighbors );
+      std::sort_heap( neighborsHeap.begin(), neighborsHeap.end() );
+      std::transform( neighborsHeap.cbegin(), neighborsHeap.cend(), nearestNeighbors[ i ].begin(), [] ( const auto& p ) { return p.second; } );
     }
     return nearestNeighbors;
   }
@@ -244,7 +243,7 @@ namespace TravelingSalespersonProblemSolver {
 
     std::vector< std::vector< size_t > > nearestNeighbors( distances.size(), std::vector< size_t >( numberOfNeighbors ) );
     alphaDistances.resize( distances.size(), std::vector< double >( numberOfNeighbors ) );
-    std::set< std::pair< double, size_t > > tmpNeighbors;
+    std::vector< std::pair< double, size_t > > neighborsHeap;
     std::vector< double > a( distances.size(), 0.0 );
     std::vector< double > b( distances.size() );
     std::vector< size_t > mark( distances.size(), 0 );
@@ -280,27 +279,26 @@ namespace TravelingSalespersonProblemSolver {
         }
         a[ frontInd ] = getDistance_( distances, lagrangeMultipliers, iInd, frontInd ) - maxEdgeWeight;
       }
-      tmpNeighbors.clear();
+      neighborsHeap.clear();
       double worstNearNeighbor = std::numeric_limits< double >::max();
       for ( size_t j = 0; j < distances.size(); ++j ) {
         if ( j != i ) {
-          size_t jInd = vertices[ j ].nodeIndex;
-          if ( tmpNeighbors.size() < numberOfNeighbors || a[ jInd ] < worstNearNeighbor ) {
-            if ( tmpNeighbors.size() >= numberOfNeighbors ) {
-              auto itLast = tmpNeighbors.end();
-              --itLast;
-              tmpNeighbors.erase( itLast );
+          const size_t jInd = vertices[ j ].nodeIndex;
+          if ( neighborsHeap.size() < numberOfNeighbors || a[ jInd ] < worstNearNeighbor ) {
+            if ( neighborsHeap.size() >= numberOfNeighbors ) {
+              std::pop_heap( neighborsHeap.begin(), neighborsHeap.end() );
+              neighborsHeap.pop_back();
             }
-            tmpNeighbors.insert( std::make_pair( a[ jInd ], jInd ) );
-            worstNearNeighbor = tmpNeighbors.rbegin()->first;
+            neighborsHeap.push_back( { a[ jInd ], jInd } );
+            std::push_heap( neighborsHeap.begin(), neighborsHeap.end() );
+            worstNearNeighbor = neighborsHeap.front().first;
           }
         }
       }
-      assert( tmpNeighbors.size() == numberOfNeighbors );
-      auto it = tmpNeighbors.cbegin();
-      for ( size_t j = 0; j < numberOfNeighbors; ++j, ++it ) {
-        alphaDistances[ iInd ][ j ] = it->first;
-        nearestNeighbors[ iInd ][ j ] = it->second;
+      assert( neighborsHeap.size() == numberOfNeighbors );
+      std::sort_heap( neighborsHeap.begin(), neighborsHeap.end() );
+      for ( size_t j = 0; j < numberOfNeighbors; ++j ) {
+        std::tie( alphaDistances[ iInd ][ j ], nearestNeighbors[ iInd ][ j ] ) = neighborsHeap[ j ];
       }
     }
     return nearestNeighbors;

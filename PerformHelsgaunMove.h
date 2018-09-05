@@ -100,7 +100,7 @@ namespace TravelingSalespersonProblemSolver {
     performKOptMove_( ts, incl, p, q, tour, position );
   }
 
-  // Indicates whether the path switches in ts defines a legal tour
+  // Indicates whether the path switches in ts define a legal tour
   bool makesTour_( const std::vector< size_t >& ts,
                    const std::vector< size_t >& tour,
                    const std::vector< size_t >& position )

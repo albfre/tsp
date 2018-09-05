@@ -74,6 +74,12 @@ namespace TravelingSalespersonProblemSolver {
     return position[ node ] + 1 < tour.size() ? tour[ position[ node ] + 1 ] : tour.front();
   }
 
+  bool isTourNeighbor_( size_t a, size_t b, const std::vector< size_t >& tour, const std::vector< size_t >& position )
+  {
+    return a == previous_( b, tour, position ) || a == next_( b, tour, position );
+  }
+
+  // When going forward from b, will a be reached before c?
   bool between_( size_t a, size_t b, size_t c, const std::vector< size_t >& position )
   {
     return position[ a ] <= position[ c ] ? position[ a ] >= position[ b ] || position[ b ] >= position[ c ]
