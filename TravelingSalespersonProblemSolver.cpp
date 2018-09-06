@@ -245,6 +245,24 @@ foundGainfulMove:
     return changed;
   }
 
+  bool isEdgeInTs_( const size_t ta, const size_t tb, const vector< size_t >& ts, const bool isAdded ) {
+    for ( size_t i = isAdded ? 1 : 0; i < ts.size(); i += 2 ) {
+      if ( ( ts[ i ] == ta && ts[ i + 1 ] == tb ) ||
+           ( ts[ i ] == tb && ts[ i + 1 ] == ta ) ) {
+         return true;
+       }
+     }
+     return false;
+  }
+
+  bool isAdded_( const size_t ta, const size_t tb, const vector< size_t >& ts ) {
+    return isEdgeInTs_( ta, tb, ts, true );
+  }
+
+  bool isDeleted_( const size_t ta, const size_t tb, const vector< size_t >& ts ) {
+    return isEdgeInTs_( ta, tb, ts, false );
+  }
+
   // Find the best feasible and infeasible k-opt moves
   double INLINE_ATTRIBUTE getBestKOptMove_( const size_t currentDepth,
                                             const size_t k,
@@ -262,85 +280,80 @@ foundGainfulMove:
                                             const vector< vector< size_t > >& nearestNeighbors )
   {
     assert( ts.size() > 1 );
-    const auto tb = ts.back();
-    vector< pair< size_t, size_t > > tcTdPairs;
-    for ( const auto& tc : nearestNeighbors[ tb ] ) {
-      const auto G1 = G0 - distances( tb, tc );
+    const auto t1 = ts.front();
+    const auto t2 = ts.back();
+    for ( const auto& t3 : nearestNeighbors[ t2 ] ) {
+      if ( isTourNeighbor_( t3, t2, tour, position ) ) {
+        continue;
+      }
+      const auto G1 = G0 - distances( t2, t3 );
       if ( G1 <= tolerance ) {
         continue;
       }
-      if ( isTourNeighbor_( tc, tb, tour, position ) ) {
-        // The added edge should not belong to T
+      if ( find( added.begin(), added.end(), make_pair( t2, t3 ) ) != added.end() ) {
         continue;
       }
-      for ( const auto& td : { previous_( tc, tour, position ), next_( tc, tour, position ) } ) {
-        const auto tctdPair = make_pair( tc, td );
+      for ( const auto& t4 : { previous_( t3, tour, position ), next_( t3, tour, position ) } ) {
+        const auto t3t4Pair = make_pair( t3, t4 );
         if ( currentDepth + 1 == k ) {
-          const auto G2 = G1 + distances( tc, td );
-          if ( G2 - distances( ts.front(), td ) <= tolerance && ( G2 <= bestG && G2 <= bestInfeasibleG ) ) {
+          const auto G2 = G1 + distances( t3, t4 );
+          if ( G2 - distances( t1, t4 ) <= tolerance && ( G2 <= bestG && G2 <= bestInfeasibleG ) ) {
             continue;
           }
-          if ( find( added.begin(), added.end(), tctdPair ) != added.end() ) {
+          if ( find( added.begin(), added.end(), t3t4Pair ) != added.end() ) {
             continue;
           }
         }
-        if ( find( removed.begin(), removed.end(), tctdPair ) != removed.end() ) {
+        if ( find( removed.begin(), removed.end(), t3t4Pair ) != removed.end() ) {
           continue;
         }
-        tcTdPairs.push_back( { tc, td } );
-      }
-    }
-    reverse( tcTdPairs.begin(), tcTdPairs.end() );
 
-    while ( !tcTdPairs.empty() ) {
-      const auto tc = tcTdPairs.back().first;
-      const auto td = tcTdPairs.back().second;
-      tcTdPairs.pop_back();
-
-      ts.push_back( tc );
-      ts.push_back( td );
-      const auto G1 = G0 - distances( tb, tc );
-      const auto G2 = G1 + distances( tc, td );
-      auto gain = G2 - distances( ts.front(), ts.back() );
-      if ( gain > tolerance && makesTour_( ts, tour, position ) ) {
-        return gain;
-      }
-
-      if ( currentDepth + 1 < k ) {
-        added.push_back( { tb, tc } );
-        added.push_back( { tc, tb } );
-        removed.push_back( { tc, td } );
-        removed.push_back( { td, tc } );
-        gain = getBestKOptMove_( currentDepth + 1,
-                                 k,
-                                 G2,
-                                 ts,
-                                 added,
-                                 removed,
-                                 bestTs,
-                                 bestG,
-                                 bestInfeasibleTs,
-                                 bestInfeasibleG,
-                                 tour,
-                                 position,
-                                 distances,
-                                 nearestNeighbors );
-        if ( gain > tolerance ) {
-          return gain;
+        ts.push_back( t3 );
+        ts.push_back( t4 );
+        const auto G1 = G0 - distances( t2, t3 );
+        const auto G2 = G1 + distances( t3, t4 );
+        const auto gain1 = G2 - distances( t1, t4 );
+        if ( gain1 > tolerance && makesTour_( ts, tour, position ) ) {
+          return gain1;
         }
-        removed.resize( removed.size() - 2 );
-        added.resize( added.size() - 2 );
-      }
-      else if ( G2 > bestG && makesTour_( ts, tour, position ) ) {
-        bestG = G2;
-        bestTs = ts;
-      }
-      else if ( G2 > bestInfeasibleG ) {
-        bestInfeasibleG = G2;
-        bestInfeasibleTs = ts;
-      }
 
-      ts.resize( ts.size() - 2 );
+        if ( currentDepth + 1 < k ) {
+          added.push_back( { t2, t3 } );
+          added.push_back( { t3, t2 } );
+          removed.push_back( { t3, t4 } );
+          removed.push_back( { t4, t3 } );
+          const auto gain2 = getBestKOptMove_( currentDepth + 1,
+                                               k,
+                                               G2,
+                                               ts,
+                                               added,
+                                               removed,
+                                               bestTs,
+                                               bestG,
+                                               bestInfeasibleTs,
+                                               bestInfeasibleG,
+                                               tour,
+                                               position,
+                                               distances,
+                                               nearestNeighbors );
+          if ( gain2 > tolerance ) {
+            return gain2;
+          }
+          removed.resize( removed.size() - 2 );
+          added.resize( added.size() - 2 );
+        }
+        else if ( G2 > bestG && gain1 <= tolerance && makesTour_( ts, tour, position ) ) {
+          // if gain1 > tolerance && makesTour, this conditional will not be reached
+          bestG = G2;
+          bestTs = ts;
+        }
+        else if ( G2 > bestInfeasibleG ) {
+          bestInfeasibleG = G2;
+          bestInfeasibleTs = ts;
+        }
+
+        ts.resize( ts.size() - 2 );
+      }
     }
     return -1.0;
   }
