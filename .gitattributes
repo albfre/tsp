@@ -1,0 +1,3 @@
+*.hcp linguist-detectable=false
+*.tsp linguist-detectable=false
+*.atsp linguist-detectable=false

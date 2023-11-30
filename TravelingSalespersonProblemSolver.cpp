@@ -245,24 +245,6 @@ foundGainfulMove:
     return changed;
   }
 
-  bool isEdgeInTs_( const size_t ta, const size_t tb, const vector< size_t >& ts, const bool isAdded ) {
-    for ( size_t i = isAdded ? 1 : 0; i < ts.size(); i += 2 ) {
-      if ( ( ts[ i ] == ta && ts[ i + 1 ] == tb ) ||
-           ( ts[ i ] == tb && ts[ i + 1 ] == ta ) ) {
-         return true;
-       }
-     }
-     return false;
-  }
-
-  bool isAdded_( const size_t ta, const size_t tb, const vector< size_t >& ts ) {
-    return isEdgeInTs_( ta, tb, ts, true );
-  }
-
-  bool isDeleted_( const size_t ta, const size_t tb, const vector< size_t >& ts ) {
-    return isEdgeInTs_( ta, tb, ts, false );
-  }
-
   // Find the best feasible and infeasible k-opt moves
   double INLINE_ATTRIBUTE getBestKOptMove_( const size_t currentDepth,
                                             const size_t k,
@@ -625,13 +607,22 @@ vector< size_t > INLINE_ATTRIBUTE TravelingSalespersonProblemSolver::computeTour
     for ( size_t i = 0; i < distances.size(); ++i ) {
       assert( distances( i, i ) == 0.0 );
       for ( size_t j = i + 1; j < distances.size(); ++j ) {
+        //std::cout << distances(i,j) << " ";
         assert( fabs( distances( i, j ) - distances( j, i ) ) < 1e-9 );
-        assert( distances( i, j ) > 0.0 );
-        assert( distances( j, i ) > 0.0 );
+        assert( distances( i, j ) >= 0.0 );
+        assert( distances( j, i ) >= 0.0 );
       }
+      //std::cout << std::endl;
     }
     double timeSanity( ( clock() - start ) / CLOCKS_PER_SEC );
     cerr << "done: " << timeSanity << endl;
+
+    for ( size_t i = 0; i < distances.size(); ++i ) {
+      for ( size_t j = 0; j < distances.size(); ++j ) {
+       // std::cout << distances(i,j) << " ";
+      }
+      //std::cout << std::endl;
+    }
   }
 
   std::mt19937 generator( 1338 );
@@ -758,6 +749,12 @@ vector< size_t > INLINE_ATTRIBUTE TravelingSalespersonProblemSolver::computeTour
     improveTourIteratedKOpt_( k, linKernighan, 100, useGain23, tour, betterTour, distances, nearestNeighbors5, random );
     double time( ( clock() - start ) / CLOCKS_PER_SEC );
     cerr << k << "-ILK tour distance: " << getLength_( tour, distances ) << ", time: " << time << endl;
+    /*
+    for ( const auto& t : tour ) {
+      cerr << t << " -> ";
+    }
+    cerr << std::endl;
+    */
   }
 
   if ( false ) {

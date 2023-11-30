@@ -103,6 +103,7 @@ vector< vector< double > > readTSP( string fileName )
         assert( iss );
         iss >> token;
         points.back()[ 1 ] = atof( token.c_str() );
+        //std::cout << points.back()[0] << " " << points.back()[1] << std::endl;
         getline( file, line );
         trim( line );
       }

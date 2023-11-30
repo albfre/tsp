@@ -2,7 +2,7 @@
 #define HELPER_FUNCTIONS_H
 
 namespace TravelingSalespersonProblemSolver {
-  const double tolerance = 1e-9;
+  constexpr auto tolerance = 1e-9;
 
   void updatePosition( const std::vector< size_t >& tour,
                        std::vector< size_t >& position )
